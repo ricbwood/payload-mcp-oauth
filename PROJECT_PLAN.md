@@ -89,24 +89,28 @@ OAuth tokens use the prefix `pmoauth_` (Payload-MCP-OAuth). The wrapper checks t
 │   ├── security.md
 │   └── threat-model.md
 ├── examples/
-│   └── payload-app/         # Reference integration for E2E tests
-├── src/
-│   ├── index.ts             # Plugin factory
-│   ├── plugin.ts            # Config mutation logic
-│   ├── collections/
-│   ├── endpoints/
-│   ├── lib/                 # Crypto, token, PKCE utilities
-│   ├── middleware/          # Handler wrapping
-│   ├── admin/               # Consent screen + admin components
-│   └── types.ts
-├── test/
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
+│   └── payload-app/         # Reference Payload 3 app (SQLite) for integration testing
+├── packages/
+│   └── plugin/              # @brainweb/payload-plugin-mcp-oauth (the published package)
+│       ├── src/
+│       │   ├── index.ts             # Plugin factory
+│       │   ├── plugin.ts            # Config mutation logic
+│       │   ├── collections/
+│       │   ├── endpoints/
+│       │   ├── lib/                 # Crypto, token, PKCE utilities
+│       │   ├── middleware/          # Handler wrapping
+│       │   ├── admin/               # Consent screen + admin components
+│       │   └── types.ts
+│       ├── test/
+│       │   ├── unit/
+│       │   ├── integration/
+│       │   └── e2e/
+│       ├── package.json
+│       └── tsconfig.json
 ├── CHANGELOG.md
 ├── README.md
-├── package.json
-├── tsconfig.json
+├── package.json             # Workspace root
+├── tsconfig.base.json       # Shared TS config
 └── PROJECT_PLAN.md
 ```
 
@@ -268,25 +272,25 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T2.1 — `oauth-clients` collection**
 - *Deps:* T1.3, T0.7.
 - *Objective:* Define a Payload collection storing registered clients: `client_id`, `client_name`, `redirect_uris[]`, `grant_types[]`, `response_types[]`, `token_endpoint_auth_method`, `software_id`, `software_version`, `created_at`, `last_used_at`, `is_active`. Access control: admin-only read in admin UI; no public API listing.
-- *Deliverable:* `src/collections/clients.ts` + tests.
+- *Deliverable:* `packages/plugin/src/collections/clients.ts` + tests.
 - *Acceptance:* Collection registers cleanly in the example app; admin can view but not edit critical fields.
 
 **T2.2 — `oauth-auth-codes` collection**
 - *Deps:* T1.2, T0.7.
 - *Objective:* Short-lived (60 s) one-time auth codes: `code_hash`, `client_id`, `user_id`, `redirect_uri`, `scope`, `code_challenge`, `code_challenge_method`, `expires_at`, `consumed_at`. Indexed on `code_hash`.
-- *Deliverable:* `src/collections/auth-codes.ts` + tests.
+- *Deliverable:* `packages/plugin/src/collections/auth-codes.ts` + tests.
 - *Acceptance:* Inserting a duplicate consumed code is impossible; a sweeper hook removes expired codes.
 
 **T2.3 — `oauth-tokens` collection**
 - *Deps:* T1.2, T0.7.
 - *Objective:* Access and refresh tokens: `token_hash`, `token_type` (`access`|`refresh`), `client_id`, `user_id`, `scope`, `capabilities` (mirrors plugin-mcp's capability toggles), `expires_at`, `revoked_at`, `last_used_at`, `parent_token_id` (for refresh-rotation chains). Indexed on `token_hash` and `user_id`.
-- *Deliverable:* `src/collections/tokens.ts` + tests.
+- *Deliverable:* `packages/plugin/src/collections/tokens.ts` + tests.
 - *Acceptance:* Revoking a refresh token cascades to its access tokens; lookups by `token_hash` are O(log n).
 
 **T2.4 — Token storage utilities**
 - *Deps:* T2.3.
 - *Objective:* Pure functions for `hashToken(plaintext): string` and `compareTokenHash(plaintext, hash): boolean` (constant-time). HMAC-SHA-256 with a server-side pepper from env (`PMOAUTH_TOKEN_PEPPER`). Document why we don't use argon2 for tokens (high request volume, tokens are already high-entropy).
-- *Deliverable:* `src/lib/token-storage.ts` + 100% unit coverage.
+- *Deliverable:* `packages/plugin/src/lib/token-storage.ts` + 100% unit coverage.
 - *Acceptance:* Timing-attack resistance verified by a microbench test (variance under threshold).
 
 ---
@@ -296,31 +300,31 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T3.1 — Secure token generation**
 - *Deps:* T2.4.
 - *Objective:* `generateToken(type: 'access'|'refresh'|'code'): string` returning `pmoauth_{type}_{32-bytes-base64url}` for tokens; `pmoauth_code_{...}` for codes. Uses `crypto.randomBytes`. Length and prefix documented in ADR-0002.
-- *Deliverable:* `src/lib/token-generation.ts` + tests including statistical entropy spot-check.
+- *Deliverable:* `packages/plugin/src/lib/token-generation.ts` + tests including statistical entropy spot-check.
 - *Acceptance:* Two consecutive calls never collide in 100k iterations; format matches regex.
 
 **T3.2 — PKCE verification**
 - *Deps:* none.
 - *Objective:* `verifyPkce(verifier: string, challenge: string, method: 'S256'): boolean`. **Reject `plain` method** with a typed error — only `S256` is supported.
-- *Deliverable:* `src/lib/pkce.ts` + tests covering RFC 7636 test vectors.
+- *Deliverable:* `packages/plugin/src/lib/pkce.ts` + tests covering RFC 7636 test vectors.
 - *Acceptance:* Known-good and known-bad vectors all pass/fail correctly; non-S256 method throws.
 
 **T3.3 — Auth-code issuance and consumption**
 - *Deps:* T2.2, T3.1, T3.2.
 - *Objective:* `issueAuthCode(payload, params)` and `consumeAuthCode(payload, code, verifier)` — the latter validates expiry, single-use (atomic update with `consumed_at`), redirect_uri match, PKCE.
-- *Deliverable:* `src/lib/auth-codes.ts` + tests.
+- *Deliverable:* `packages/plugin/src/lib/auth-codes.ts` + tests.
 - *Acceptance:* Double-spend test: two parallel consumes of the same code — exactly one succeeds.
 
 **T3.4 — Access & refresh token issuance**
 - *Deps:* T2.3, T2.4, T3.1.
 - *Objective:* `issueTokenPair(payload, params)` returns `{access_token, refresh_token, expires_in, token_type, scope}`. Refresh rotation: `rotateRefreshToken()` invalidates the parent and issues a new pair.
-- *Deliverable:* `src/lib/tokens.ts` + tests.
+- *Deliverable:* `packages/plugin/src/lib/tokens.ts` + tests.
 - *Acceptance:* Using an already-rotated refresh token revokes the entire family (reuse detection per OAuth 2.1 BCP).
 
 **T3.5 — Token validation**
 - *Deps:* T3.4.
 - *Objective:* `validateAccessToken(payload, plaintext): Promise<TokenContext | null>`. Returns user + capabilities or null. Updates `last_used_at` (best-effort, non-blocking). Constant-time on the not-found branch.
-- *Deliverable:* `src/lib/validate.ts` + tests.
+- *Deliverable:* `packages/plugin/src/lib/validate.ts` + tests.
 - *Acceptance:* Expired, revoked, and unknown tokens all return null; valid token returns the right user; timing variance test passes.
 
 ---
@@ -330,49 +334,49 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T4.1 — Metadata: `/.well-known/oauth-authorization-server`**
 - *Deps:* T1.2, T1.3.
 - *Objective:* RFC 8414 metadata. Includes `issuer`, `authorization_endpoint`, `token_endpoint`, `registration_endpoint`, `revocation_endpoint`, `response_types_supported: ['code']`, `grant_types_supported: ['authorization_code', 'refresh_token']`, `code_challenge_methods_supported: ['S256']`, `token_endpoint_auth_methods_supported: ['none']`.
-- *Deliverable:* `src/endpoints/metadata-as.ts` + test.
+- *Deliverable:* `packages/plugin/src/endpoints/metadata-as.ts` + test.
 - *Acceptance:* Output validates against an RFC 8414 schema; CORS headers correct.
 
 **T4.2 — Metadata: `/.well-known/oauth-protected-resource`**
 - *Deps:* T4.1.
 - *Objective:* RFC 9728 resource metadata pointing back to the AS.
-- *Deliverable:* `src/endpoints/metadata-prm.ts` + test.
+- *Deliverable:* `packages/plugin/src/endpoints/metadata-prm.ts` + test.
 - *Acceptance:* MCP Inspector discovers the AS via PRM.
 
 **T4.3 — `POST /api/oauth/register` (Dynamic Client Registration)**
 - *Deps:* T2.1, T1.3.
 - *Objective:* RFC 7591 minimal subset: accept `client_name`, `redirect_uris`, `token_endpoint_auth_method: 'none'`, `grant_types: ['authorization_code', 'refresh_token']`, `response_types: ['code']`. Validate, persist, return `client_id`. **No `client_secret` issued** (public clients only).
-- *Deliverable:* `src/endpoints/register.ts` + tests including invalid-input cases.
+- *Deliverable:* `packages/plugin/src/endpoints/register.ts` + tests including invalid-input cases.
 - *Acceptance:* Claude.ai's registration request succeeds; malformed input returns the correct RFC-7591 error.
 
 **T4.4 — `GET /api/oauth/authorize` (consent flow start)**
 - *Deps:* T2.1, T2.2, T3.2, T1.4.
 - *Objective:* Validate `response_type=code`, `client_id`, `redirect_uri` (exact match against registered URIs — no prefix matching), `code_challenge`, `code_challenge_method=S256`, `state`, `scope`. If user not logged into Payload admin, redirect to Payload login with `?redirect=` back to this endpoint. Otherwise, render consent screen.
-- *Deliverable:* `src/endpoints/authorize.ts` + tests.
+- *Deliverable:* `packages/plugin/src/endpoints/authorize.ts` + tests.
 - *Acceptance:* Open-redirect attempts via `redirect_uri` are rejected; CSRF via `state` is enforced; unknown `client_id` returns the right error.
 
 **T4.5 — `POST /api/oauth/consent` (consent submission)**
 - *Deps:* T4.4, T3.3.
 - *Objective:* Receive consent decision, if approved issue an auth code bound to user + client + PKCE challenge + redirect, then 302 to `redirect_uri` with `code` and `state`.
-- *Deliverable:* `src/endpoints/consent.ts` + tests.
+- *Deliverable:* `packages/plugin/src/endpoints/consent.ts` + tests.
 - *Acceptance:* Denial path returns `access_denied` per RFC 6749 §4.1.2.1; approval issues exactly one code.
 
 **T4.6 — `POST /api/oauth/token`**
 - *Deps:* T3.3, T3.4.
 - *Objective:* Handle both `grant_type=authorization_code` (with code + verifier + redirect_uri + client_id) and `grant_type=refresh_token` (with refresh + client_id). Return token pair or RFC 6749 error.
-- *Deliverable:* `src/endpoints/token.ts` + tests covering both grants and every error path.
+- *Deliverable:* `packages/plugin/src/endpoints/token.ts` + tests covering both grants and every error path.
 - *Acceptance:* All RFC 6749 error responses correctly shaped; refresh rotation works; reuse triggers family revocation.
 
 **T4.7 — `POST /api/oauth/revoke`**
 - *Deps:* T3.5.
 - *Objective:* RFC 7009. Accept `token` and optional `token_type_hint`. Revoke if owned by the calling client (verify via auth or by token contents). Idempotent — always returns 200.
-- *Deliverable:* `src/endpoints/revoke.ts` + tests.
+- *Deliverable:* `packages/plugin/src/endpoints/revoke.ts` + tests.
 - *Acceptance:* Revoking an unknown token still returns 200; revoking a refresh cascades.
 
 **T4.8 — Rate limiting middleware**
 - *Deps:* T4.3–T4.7.
 - *Objective:* Per-IP and per-client_id rate limits on `/register`, `/authorize`, `/token`, `/revoke`. In-memory LRU bucket for self-hosted simplicity; pluggable interface so users can swap Redis later.
-- *Deliverable:* `src/middleware/rate-limit.ts` + tests.
+- *Deliverable:* `packages/plugin/src/middleware/rate-limit.ts` + tests.
 - *Acceptance:* Burst test trips the limiter; configurable thresholds documented.
 
 ---
@@ -382,31 +386,31 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T5.1 — Config schema**
 - *Deps:* T1.5.
 - *Objective:* `zod`-validated options: `issuer` (URL), token TTLs, rate-limit overrides, optional registration access token requirement, peer-version range, logger injection.
-- *Deliverable:* `src/types.ts` and validation in `src/index.ts`.
+- *Deliverable:* `packages/plugin/src/types.ts` and validation in `packages/plugin/src/index.ts`.
 - *Acceptance:* Invalid options throw at boot with a clear message; types exported for consumers.
 
 **T5.2 — Plugin factory function**
 - *Deps:* T5.1.
 - *Objective:* The exported `payloadMcpOAuth(options)` returns a Payload plugin function `(incomingConfig) => updatedConfig`.
-- *Deliverable:* `src/index.ts`.
+- *Deliverable:* `packages/plugin/src/index.ts`.
 - *Acceptance:* Importable, type-correct, no side effects until invoked.
 
 **T5.3 — Plugin order detection**
 - *Deps:* T5.2, T1.5.
 - *Objective:* Locate the upstream MCP endpoint in `incomingConfig.endpoints`. Throw the ADR-0005 error if absent. Detect upstream version from `package.json` resolution and warn if outside the supported range.
-- *Deliverable:* `src/plugin.ts` (order check section).
+- *Deliverable:* `packages/plugin/src/plugin.ts` (order check section).
 - *Acceptance:* Reordering the plugins in the example app reproduces the error.
 
 **T5.4 — MCP endpoint handler wrapping**
 - *Deps:* T5.3, T3.5.
 - *Objective:* Replace `mcpEndpoint.handler` with a wrapper that: extracts Bearer; if it has the `pmoauth_` prefix, validates and attaches user (matching upstream's contract per ADR-0001); always calls the original handler. On wrapper-side validation failure, return `401` with `WWW-Authenticate: Bearer error="invalid_token"`.
-- *Deliverable:* `src/middleware/wrap-mcp.ts` + tests.
+- *Deliverable:* `packages/plugin/src/middleware/wrap-mcp.ts` + tests.
 - *Acceptance:* API-key path unchanged; OAuth path delivers the correct user; unknown token returns 401 in spec-compliant form.
 
 **T5.5 — Endpoint registration**
 - *Deps:* T4.1–T4.8, T5.2.
 - *Objective:* Push the OAuth endpoints + collections into `incomingConfig`. Ensure no path collisions.
-- *Deliverable:* Complete `src/plugin.ts`.
+- *Deliverable:* Complete `packages/plugin/src/plugin.ts`.
 - *Acceptance:* `pnpm --filter example dev` boots cleanly with both plugins registered.
 
 ---
@@ -416,19 +420,19 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T6.1 — Consent screen component**
 - *Deps:* T4.4, T1.4.
 - *Objective:* React component shown by the authorize endpoint. Displays client name, requested capabilities mapped to plain-English scopes (e.g. "Read and write Posts"), Approve/Deny buttons posting to `/api/oauth/consent`. Security headers set: `X-Frame-Options: DENY`, strict CSP, no inline scripts.
-- *Deliverable:* `src/admin/ConsentScreen.tsx` + Playwright test.
+- *Deliverable:* `packages/plugin/src/admin/ConsentScreen.tsx` + Playwright test.
 - *Acceptance:* Clickjacking attempt in an iframe fails; XSS in `client_name` is escaped.
 
 **T6.2 — Active tokens admin view**
 - *Deps:* T2.3.
 - *Objective:* In Payload admin, surface active OAuth tokens for the logged-in user with revoke buttons. Admins see all; users see their own.
-- *Deliverable:* `src/admin/TokensView.tsx`.
+- *Deliverable:* `packages/plugin/src/admin/TokensView.tsx`.
 - *Acceptance:* IDOR test: user A cannot list or revoke user B's tokens.
 
 **T6.3 — Registered clients view**
 - *Deps:* T2.1.
 - *Objective:* Admin-only view of registered clients with last-used timestamp and active/inactive toggle.
-- *Deliverable:* `src/admin/ClientsView.tsx`.
+- *Deliverable:* `packages/plugin/src/admin/ClientsView.tsx`.
 - *Acceptance:* Non-admin Payload users get 403.
 
 ---
@@ -444,31 +448,31 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T7.2 — Integration harness against example app**
 - *Deps:* T0.7, T5.5.
 - *Objective:* Helper that boots the example Payload app in-process, seeds users and clients, exposes an HTTP client. Used by all integration tests.
-- *Deliverable:* `test/integration/harness.ts`.
+- *Deliverable:* `packages/plugin/test/integration/harness.ts`.
 - *Acceptance:* A trivial test (hit metadata endpoint) passes consistently in CI.
 
 **T7.3 — Happy-path OAuth flow integration test**
 - *Deps:* T7.2, all of Phase 4.
 - *Objective:* End-to-end: register → authorize (simulated login + consent) → token exchange → call MCP endpoint with access token → refresh → call again.
-- *Deliverable:* `test/integration/happy-path.test.ts`.
+- *Deliverable:* `packages/plugin/test/integration/happy-path.test.ts`.
 - *Acceptance:* Passes consistently; runs in < 30 s.
 
 **T7.4 — Negative-path / abuse tests**
 - *Deps:* T7.2.
 - *Objective:* Cover every threat enumerated in the threat model: PKCE downgrade, code reuse, refresh reuse, open redirect, CSRF (missing state), expired token, revoked token, IDOR on tokens collection, mismatched redirect_uri, malformed registration, rate-limit trip.
-- *Deliverable:* `test/integration/security.test.ts`.
+- *Deliverable:* `packages/plugin/test/integration/security.test.ts`.
 - *Acceptance:* Every threat has at least one test that proves the mitigation works.
 
 **T7.5 — API-key regression test**
 - *Deps:* T7.2.
 - *Objective:* Verify that the existing API-key MCP flow continues to work unchanged when our plugin is loaded.
-- *Deliverable:* `test/integration/api-key-regression.test.ts`.
+- *Deliverable:* `packages/plugin/test/integration/api-key-regression.test.ts`.
 - *Acceptance:* Identical request/response with and without our plugin loaded.
 
 **T7.6 — MCP Inspector smoke test**
 - *Deps:* T7.3.
 - *Objective:* Script that launches the example app and runs `@modelcontextprotocol/inspector` against it via OAuth, asserting the handshake completes.
-- *Deliverable:* `test/e2e/mcp-inspector.test.ts` (optional in CI, mandatory pre-release).
+- *Deliverable:* `packages/plugin/test/e2e/mcp-inspector.test.ts` (optional in CI, mandatory pre-release).
 - *Acceptance:* Inspector reports a successful authenticated session.
 
 **T7.7 — Claude.ai connector E2E (manual + recorded)**
@@ -480,7 +484,7 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T7.8 — Performance test on validation hot path**
 - *Deps:* T3.5.
 - *Objective:* Benchmark `validateAccessToken` at 100/500/2000 RPS. Document p50/p95/p99 latency and the database query plan.
-- *Deliverable:* `test/perf/validate.bench.ts` + a short results note in `docs/`.
+- *Deliverable:* `packages/plugin/test/perf/validate.bench.ts` + a short results note in `docs/`.
 - *Acceptance:* p95 < 25 ms on a SQLite example with 100k tokens; results stored as a baseline for regression.
 
 ---
@@ -490,19 +494,19 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 **T8.1 — Security headers audit**
 - *Deps:* T6.1, T4.4.
 - *Objective:* Verify all HTML responses set CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy. All JSON responses set `Cache-Control: no-store` and `Pragma: no-cache`.
-- *Deliverable:* `src/middleware/security-headers.ts` + tests asserting presence on every endpoint.
+- *Deliverable:* `packages/plugin/src/middleware/security-headers.ts` + tests asserting presence on every endpoint.
 - *Acceptance:* Mozilla Observatory–style checklist all pass.
 
 **T8.2 — Audit logging**
 - *Deps:* T4.3–T4.7.
 - *Objective:* Log (via Payload's logger) every: client registration, authorize start, consent approve/deny, token issue, token refresh, token revoke, invalid token attempt. Include client_id, user_id (when known), IP, user-agent. Never log token values or codes.
-- *Deliverable:* `src/lib/audit.ts` + tests verifying no secret material reaches the log.
+- *Deliverable:* `packages/plugin/src/lib/audit.ts` + tests verifying no secret material reaches the log.
 - *Acceptance:* Manual grep on logs after a happy-path run finds zero token plaintext.
 
 **T8.3 — Secret handling review**
 - *Deps:* T0.5.
 - *Objective:* Document required env vars (`PMOAUTH_TOKEN_PEPPER`, etc.), enforce minimum entropy at boot, refuse to start in production with defaults.
-- *Deliverable:* Boot-time check in `src/index.ts`; section in `docs/configuration.md`.
+- *Deliverable:* Boot-time check in `packages/plugin/src/index.ts`; section in `docs/configuration.md`.
 - *Acceptance:* Boot fails fast on a missing or weak pepper in `NODE_ENV=production`.
 
 **T8.4 — Dependency audit & SBOM**
