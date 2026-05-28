@@ -1,6 +1,6 @@
 import { sqliteAdapter } from '@payloadcms/db-sqlite'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { payloadMcp } from '@payloadcms/plugin-mcp'
+import { mcpPlugin } from '@payloadcms/plugin-mcp'
 import path from 'path'
 import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
@@ -36,7 +36,7 @@ export default buildConfig({
   }),
   sharp,
   plugins: [
-    payloadMcp({}),
+    mcpPlugin({}),
     // TODO T5.2: payloadMcpOAuth({ issuer: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000' }),
   ],
 })

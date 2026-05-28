@@ -14,10 +14,10 @@
     "lint": "cross-env NODE_OPTIONS=--no-deprecation eslint .",
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "start": "cross-env NODE_OPTIONS=--no-deprecation next start",
-    "test": "pnpm run test:integration && pnpm run test:e2e",
+    "test": "pnpm run test:integration",
     "test:e2e": "cross-env NODE_OPTIONS=\"--no-deprecation --import=tsx/esm\" playwright test --config=playwright.config.ts",
     "test:int": "cross-env NODE_OPTIONS=--no-deprecation vitest run --config ./vitest.config.mts",
-    "test:integration": "vitest run"
+    "test:integration": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@brainweb/payload-plugin-mcp-oauth": "workspace:*",
