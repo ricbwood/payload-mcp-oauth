@@ -21,11 +21,11 @@
   },
   "peerDependencies": {
     "payload": "^3.0.0",
-    "@payloadcms/plugin-mcp": "^x.y.z"
+    "@payloadcms/plugin-mcp": "^3.0.0"
   },
   "devDependencies": {
-    "payload": "^3.0.0",
-    "@payloadcms/plugin-mcp": "^x.y.z",
+    "payload": "^3.85.0",
+    "@payloadcms/plugin-mcp": "3.85.0",
     "tsup": "8.3.5",
     "vitest": "2.1.8"
   },
