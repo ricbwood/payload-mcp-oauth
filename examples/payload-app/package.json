@@ -1,0 +1,15 @@
+{
+  "name": "example-payload-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "payload dev",
+    "build": "payload build",
+    "test:integration": "vitest run"
+  },
+  "dependencies": {
+    "@brainweb/payload-plugin-mcp-oauth": "workspace:*",
+    "@payloadcms/plugin-mcp": "^x.y.z",
+    "payload": "^3.0.0"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "oauth-plugin-monorepo",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=9"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "pnpm -r --filter='./packages/*' build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "dev:example": "pnpm --filter ./examples/payload-app dev"
+  },
+  "devDependencies": {
+    "typescript": "5.6.3",
+    "prettier": "3.3.3"
+  }
+}
