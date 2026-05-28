@@ -23,6 +23,15 @@
       "sharp",
       "esbuild",
       "unrs-resolver"
-    ]
+    ],
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "monaco-editor",
+        "yjs"
+      ],
+      "allowedVersions": {
+        "mcp-handler>@modelcontextprotocol/sdk": "1.27.1"
+      }
+    }
   }
 }
