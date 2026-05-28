@@ -1,6 +1,7 @@
 {
   "name": "@brainweb/payload-plugin-mcp-oauth",
   "version": "0.0.0",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -24,7 +25,7 @@
     "@payloadcms/plugin-mcp": "^3.0.0"
   },
   "devDependencies": {
-    "payload": "^3.85.0",
+    "payload": "3.85.0",
     "@payloadcms/plugin-mcp": "3.85.0",
     "tsup": "8.3.5",
     "vitest": "2.1.8"

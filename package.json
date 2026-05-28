@@ -17,5 +17,21 @@
   "devDependencies": {
     "typescript": "5.6.3",
     "prettier": "3.3.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp",
+      "esbuild",
+      "unrs-resolver"
+    ],
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "monaco-editor",
+        "yjs"
+      ],
+      "allowedVersions": {
+        "mcp-handler>@modelcontextprotocol/sdk": "1.27.1"
+      }
+    }
   }
 }
