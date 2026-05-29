@@ -26,5 +26,8 @@ export type { RateLimitConfig, RateLimitOptions, RateLimiter } from './middlewar
  * ```
  */
 export function payloadMcpOAuth(options: PayloadMcpOAuthConfig): Plugin {
-  return (incomingConfig) => buildPlugin(incomingConfig, options)
+  const fn: Plugin = (incomingConfig) => buildPlugin(incomingConfig, options)
+  // mcpPlugin uses definePlugin with order:10; we must run after it
+  fn.order = 20
+  return fn
 }
