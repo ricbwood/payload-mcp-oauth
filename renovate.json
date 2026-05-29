@@ -1,0 +1,52 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "group:monorepos",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":separatePatchReleases"
+  ],
+  "timezone": "Europe/London",
+  "schedule": ["before 9am on Monday"],
+  "labels": ["dependencies"],
+  "commitMessagePrefix": "chore(deps):",
+  "packageRules": [
+    {
+      "description": "Payload CMS core and plugins — separate group, no automerge (peer contract changes)",
+      "matchPackageNames": ["payload"],
+      "matchPackagePatterns": ["^@payloadcms/"],
+      "groupName": "Payload CMS",
+      "automerge": false,
+      "labels": ["dependencies", "payload"]
+    },
+    {
+      "description": "All devDependencies grouped together (except Payload and GitHub Actions)",
+      "matchDepTypes": ["devDependencies"],
+      "excludePackageNames": ["payload"],
+      "excludePackagePatterns": ["^@payloadcms/"],
+      "groupName": "dev dependencies",
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "GitHub Actions — group together, automerge patch/minor",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    },
+    {
+      "description": "Production dependency patch updates — safe to automerge",
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["patch"],
+      "excludePackageNames": ["payload"],
+      "excludePackagePatterns": ["^@payloadcms/"],
+      "automerge": true,
+      "automergeType": "pr",
+      "automergeStrategy": "squash"
+    }
+  ]
+}
