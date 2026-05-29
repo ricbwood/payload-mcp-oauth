@@ -1,0 +1,92 @@
+import type { PayloadHandler } from 'payload'
+import { randomUUID } from 'crypto'
+import { oauthErrorResponse, jsonResponse, parseBody } from './helpers.js'
+
+export function makeRegisterHandler(): PayloadHandler {
+  return async (req) => {
+    if (req.method !== 'POST') {
+      return oauthErrorResponse(405, 'invalid_request', 'Method not allowed')
+    }
+
+    const body = await parseBody(req)
+
+    const clientName = body['client_name']
+    if (typeof clientName !== 'string' || clientName.trim() === '') {
+      return oauthErrorResponse(400, 'invalid_client_metadata', 'client_name is required')
+    }
+
+    // redirect_uris: must be a non-empty array of strings (RFC 7591 requires JSON body)
+    const rawRedirectUris = body['redirect_uris']
+    if (!Array.isArray(rawRedirectUris) || rawRedirectUris.length === 0) {
+      return oauthErrorResponse(400, 'invalid_client_metadata', 'redirect_uris must be a non-empty array')
+    }
+
+    const redirectUris: string[] = []
+    for (const uri of rawRedirectUris) {
+      if (typeof uri !== 'string') {
+        return oauthErrorResponse(400, 'invalid_client_metadata', 'redirect_uris must contain strings')
+      }
+      let parsed: URL
+      try {
+        parsed = new URL(uri)
+      } catch {
+        return oauthErrorResponse(400, 'invalid_redirect_uri', `Invalid redirect_uri: ${uri}`)
+      }
+      const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'
+      if (parsed.protocol !== 'https:' && !isLocalhost) {
+        return oauthErrorResponse(400, 'invalid_redirect_uri', `redirect_uri must use HTTPS: ${uri}`)
+      }
+      redirectUris.push(uri)
+    }
+
+    const authMethod = body['token_endpoint_auth_method']
+    if (authMethod !== undefined && authMethod !== 'none') {
+      return oauthErrorResponse(400, 'invalid_client_metadata', 'Only token_endpoint_auth_method=none is supported')
+    }
+
+    const ALLOWED_GRANTS = new Set(['authorization_code', 'refresh_token'])
+    const grantTypes = body['grant_types']
+    if (grantTypes !== undefined) {
+      if (!Array.isArray(grantTypes) || grantTypes.some((g) => !ALLOWED_GRANTS.has(g as string))) {
+        return oauthErrorResponse(400, 'invalid_client_metadata', 'Unsupported grant_type')
+      }
+    }
+
+    const responseTypes = body['response_types']
+    if (responseTypes !== undefined) {
+      if (!Array.isArray(responseTypes) || responseTypes.some((r) => r !== 'code')) {
+        return oauthErrorResponse(400, 'invalid_client_metadata', 'Unsupported response_type')
+      }
+    }
+
+    const clientId = randomUUID()
+    const trimmedName = clientName.trim()
+
+    await req.payload.create({
+      collection: 'oauth-clients',
+      data: {
+        clientId,
+        clientName: trimmedName,
+        redirectUris,
+        tokenEndpointAuthMethod: 'none',
+        grantTypes: ['authorization_code', 'refresh_token'],
+        responseTypes: ['code'],
+        softwareId: typeof body['software_id'] === 'string' ? body['software_id'] : undefined,
+        softwareVersion: typeof body['software_version'] === 'string' ? body['software_version'] : undefined,
+        isActive: true,
+      },
+    })
+
+    return jsonResponse(
+      {
+        client_id: clientId,
+        client_name: trimmedName,
+        redirect_uris: redirectUris,
+        token_endpoint_auth_method: 'none',
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+      },
+      201,
+    )
+  }
+}
