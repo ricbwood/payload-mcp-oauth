@@ -177,7 +177,26 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     },
   ]
 
-  // T5.5: add collections and endpoints to config
+  // T6.2 / T6.3: register admin views
+  const adminViews = {
+    ...(incomingConfig.admin?.components?.views ?? {}),
+    'oauth-tokens': {
+      Component: {
+        path: '@brainweb/payload-plugin-mcp-oauth/admin',
+        exportName: 'TokensView',
+      },
+      path: '/oauth/tokens' as `/${string}`,
+    },
+    'oauth-clients': {
+      Component: {
+        path: '@brainweb/payload-plugin-mcp-oauth/admin',
+        exportName: 'ClientsView',
+      },
+      path: '/oauth/clients' as `/${string}`,
+    },
+  }
+
+  // T5.5 / T6: merge collections, endpoints, and admin views
   return {
     ...incomingConfig,
     collections: [
@@ -187,5 +206,12 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
       oauthTokensCollection,
     ],
     endpoints: [...(incomingConfig.endpoints ?? []), ...oauthEndpoints],
+    admin: {
+      ...incomingConfig.admin,
+      components: {
+        ...incomingConfig.admin?.components,
+        views: adminViews,
+      },
+    },
   }
 }

@@ -1,5 +1,8 @@
+import { renderToString } from 'react-dom/server'
+import { createElement } from 'react'
 import type { PayloadHandler } from 'payload'
-import { oauthErrorResponse, redirectResponse, htmlResponse } from './helpers.js'
+import { ConsentScreen } from '../admin/ConsentScreen.js'
+import { oauthErrorResponse, redirectResponse } from './helpers.js'
 
 function errorRedirect(redirectUri: string | null, error: string, description: string, state?: string): Response {
   if (!redirectUri) {
@@ -67,49 +70,22 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
     }
 
     const clientName = String(client['clientName'] ?? clientId)
-    const scopeDisplay = scope || '(no specific scope)'
     const userId = String((user as Record<string, unknown>)['id'] ?? '')
 
-    return htmlResponse(
-      consentHtml({ clientName, scope: scopeDisplay, clientId, redirectUri, codeChallenge, codeChallengeMethod: 'S256', state, userId, scopeRaw: scope }),
+    const html = '<!DOCTYPE html>' + renderToString(
+      createElement(ConsentScreen, { clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId }),
     )
+
+    return new Response(html, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store',
+        'X-Frame-Options': 'DENY',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer',
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'",
+      },
+    })
   }
-}
-
-interface ConsentParams {
-  clientName: string
-  scope: string
-  scopeRaw: string
-  clientId: string
-  redirectUri: string
-  codeChallenge: string
-  codeChallengeMethod: string
-  state: string
-  userId: string
-}
-
-function escape(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
-
-function consentHtml(p: ConsentParams): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="utf-8"><title>Authorize ${escape(p.clientName)}</title></head>
-<body>
-<h1>Authorize ${escape(p.clientName)}</h1>
-<p>The application is requesting access: <strong>${escape(p.scope)}</strong></p>
-<form method="POST" action="/api/oauth/consent">
-  <input type="hidden" name="client_id" value="${escape(p.clientId)}">
-  <input type="hidden" name="redirect_uri" value="${escape(p.redirectUri)}">
-  <input type="hidden" name="code_challenge" value="${escape(p.codeChallenge)}">
-  <input type="hidden" name="code_challenge_method" value="${escape(p.codeChallengeMethod)}">
-  <input type="hidden" name="state" value="${escape(p.state)}">
-  <input type="hidden" name="user_id" value="${escape(p.userId)}">
-  <input type="hidden" name="scope" value="${escape(p.scopeRaw)}">
-  <button type="submit" name="decision" value="approve">Approve</button>
-  <button type="submit" name="decision" value="deny">Deny</button>
-</form>
-</body>
-</html>`
 }
