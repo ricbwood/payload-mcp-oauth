@@ -125,8 +125,16 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
     const user = req.user
     if (!user) {
       const resolvedLogin = loginPath ?? `${adminPath}/login`
-      const returnTo = encodeURIComponent(req.url ?? '/api/oauth/authorize')
-      return redirectResponse(`${resolvedLogin}?redirect=${returnTo}`)
+      // Use path+search only — avoids localhost vs tunnel protocol mismatch
+      let returnPath = '/api/oauth/authorize'
+      try {
+        const u = new URL(req.url ?? '')
+        returnPath = u.pathname + u.search
+      } catch {
+        // req.url was a relative path already
+        returnPath = req.url ?? '/api/oauth/authorize'
+      }
+      return redirectResponse(`${resolvedLogin}?redirect=${encodeURIComponent(returnPath)}`)
     }
 
     const clientName = String(client['clientName'] ?? clientId)
