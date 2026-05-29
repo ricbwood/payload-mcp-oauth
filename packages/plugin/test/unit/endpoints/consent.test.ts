@@ -7,7 +7,7 @@ const REGISTERED_URI = 'https://example.com/cb'
 const VALID_CLIENT = {
   id: 'client-doc-1',
   clientId: 'client-1',
-  redirectUris: [REGISTERED_URI],
+  redirectUris: [{ uri: REGISTERED_URI }],
   isActive: true,
 }
 

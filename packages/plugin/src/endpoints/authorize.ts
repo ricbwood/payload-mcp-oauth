@@ -105,7 +105,7 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
       return errorRedirect(null, 'invalid_client', 'Unknown client_id', state)
     }
 
-    const registered = client['redirectUris'] as string[]
+    const registered = (client['redirectUris'] as Array<{ uri: string }>).map((r) => r.uri)
     if (!redirectUri || !registered.includes(redirectUri)) {
       return errorRedirect(null, 'invalid_redirect_uri', 'redirect_uri does not match registered URIs', state)
     }

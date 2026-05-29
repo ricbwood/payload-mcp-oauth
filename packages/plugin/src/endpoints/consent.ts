@@ -44,7 +44,7 @@ export function makeConsentHandler(): PayloadHandler {
     if (!client) {
       return oauthErrorResponse(400, 'invalid_client', 'Unknown client_id')
     }
-    const registered = client['redirectUris'] as string[]
+    const registered = (client['redirectUris'] as Array<{ uri: string }>).map((r) => r.uri)
     if (!registered.includes(redirectUri)) {
       return oauthErrorResponse(400, 'invalid_redirect_uri', 'redirect_uri does not match registered URIs')
     }

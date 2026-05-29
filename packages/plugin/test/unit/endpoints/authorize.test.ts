@@ -6,7 +6,7 @@ const VALID_CLIENT = {
   id: 'client-doc-1',
   clientId: 'client-1',
   clientName: 'Test App',
-  redirectUris: [REGISTERED_URI],
+  redirectUris: [{ uri: REGISTERED_URI }],
   isActive: true,
 }
 

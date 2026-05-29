@@ -67,7 +67,7 @@ export function makeRegisterHandler(): PayloadHandler {
       data: {
         clientId,
         clientName: trimmedName,
-        redirectUris,
+        redirectUris: redirectUris.map((uri) => ({ uri })),
         tokenEndpointAuthMethod: 'none',
         grantTypes: ['authorization_code', 'refresh_token'],
         responseTypes: ['code'],
