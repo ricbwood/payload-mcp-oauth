@@ -1,8 +1,68 @@
-import { renderToString } from 'react-dom/server'
-import { createElement } from 'react'
 import type { PayloadHandler } from 'payload'
-import { ConsentScreen } from '../admin/ConsentScreen.js'
 import { oauthErrorResponse, redirectResponse } from './helpers.js'
+
+const SCOPE_LABELS: Record<string, string> = {
+  'posts:read': 'Read posts',
+  'posts:write': 'Create and update posts',
+  'posts:delete': 'Delete posts',
+  'media:read': 'Read media files',
+  'media:write': 'Upload and manage media',
+  'users:read': 'Read user profiles',
+  openid: 'Confirm your identity',
+  profile: 'Access your profile information',
+  email: 'Access your email address',
+}
+
+function e(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;')
+}
+
+function buildConsentHtml(p: {
+  clientName: string
+  scope: string
+  clientId: string
+  redirectUri: string
+  codeChallenge: string
+  codeChallengeMethod: string
+  state: string
+  userId: string
+}): string {
+  const labels = p.scope.trim()
+    ? p.scope.split(/\s+/).filter(Boolean).map((s) => SCOPE_LABELS[s] ?? s)
+    : ['Access your Payload CMS instance']
+  const items = labels.map((l) => `<li>${e(l)}</li>`).join('')
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Authorize ${e(p.clientName)}</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:480px;margin:80px auto;padding:0 1rem}
+h1{font-size:1.25rem;margin-bottom:0.5rem}
+.scope-list{list-style:disc;padding-left:1.5rem;margin:1rem 0}
+.actions{display:flex;gap:0.75rem;margin-top:1.5rem}
+.btn{padding:0.5rem 1.25rem;border:none;border-radius:4px;cursor:pointer;font-size:1rem}
+.btn-approve{background:#0070f3;color:#fff}
+.btn-deny{background:#f0f0f0;color:#333}
+</style>
+</head><body>
+<h1>Authorize <strong>${e(p.clientName)}</strong></h1>
+<p>This application is requesting the following permissions:</p>
+<ul class="scope-list">${items}</ul>
+<form method="POST" action="/api/oauth/consent">
+<input type="hidden" name="client_id" value="${e(p.clientId)}">
+<input type="hidden" name="redirect_uri" value="${e(p.redirectUri)}">
+<input type="hidden" name="code_challenge" value="${e(p.codeChallenge)}">
+<input type="hidden" name="code_challenge_method" value="${e(p.codeChallengeMethod)}">
+<input type="hidden" name="state" value="${e(p.state)}">
+<input type="hidden" name="user_id" value="${e(p.userId)}">
+<input type="hidden" name="scope" value="${e(p.scope)}">
+<div class="actions">
+<button type="submit" name="decision" value="approve" class="btn btn-approve">Approve</button>
+<button type="submit" name="decision" value="deny" class="btn btn-deny">Deny</button>
+</div>
+</form>
+</body></html>`
+}
 
 function errorRedirect(redirectUri: string | null, error: string, description: string, state?: string): Response {
   if (!redirectUri) {
@@ -72,11 +132,7 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
     const clientName = String(client['clientName'] ?? clientId)
     const userId = String((user as Record<string, unknown>)['id'] ?? '')
 
-    const html = '<!DOCTYPE html>' + renderToString(
-      createElement(ConsentScreen, { clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId }),
-    )
-
-    return new Response(html, {
+    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId }), {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
