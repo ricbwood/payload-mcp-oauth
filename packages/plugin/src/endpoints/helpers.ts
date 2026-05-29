@@ -30,9 +30,12 @@ export function htmlResponse(html: string, extraHeaders: Record<string, string> 
   })
 }
 
-// Returns parsed body. JSON content-type → object with original types.
-// x-www-form-urlencoded → flat Record<string, string>.
+// Returns parsed body. Payload pre-parses into req.data in handler context;
+// fall back to stream for cases where it isn't set (e.g. form-urlencoded).
 export async function parseBody(req: PayloadRequest): Promise<Record<string, unknown>> {
+  if (req.data && typeof req.data === 'object') {
+    return req.data as Record<string, unknown>
+  }
   const contentType = req.headers.get('content-type') ?? ''
   if (contentType.includes('application/x-www-form-urlencoded')) {
     const text = await req.text?.()
