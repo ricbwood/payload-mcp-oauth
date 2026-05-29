@@ -38,10 +38,7 @@ const sweepExpiredCodes: CollectionAfterChangeHook = async ({ operation, req }) 
 export const oauthAuthCodesCollection: CollectionConfig = {
   slug: 'oauth-auth-codes',
   admin: {
-    group: 'OAuth',
-    useAsTitle: 'codeHash',
-    defaultColumns: ['codeHash', 'clientId', 'userId', 'expiresAt', 'consumedAt'],
-    description: 'Short-lived single-use authorization codes (60 s TTL). Consumed codes are swept automatically.',
+    hidden: true,
   },
   access: {
     create: isAuthenticated,

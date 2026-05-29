@@ -43,10 +43,7 @@ const cascadeRevokeAccessTokens: CollectionAfterChangeHook = async ({
 export const oauthTokensCollection: CollectionConfig = {
   slug: 'oauth-tokens',
   admin: {
-    group: 'OAuth',
-    useAsTitle: 'tokenHash',
-    defaultColumns: ['tokenType', 'clientId', 'userId', 'expiresAt', 'revokedAt'],
-    description: 'OAuth 2.1 access and refresh tokens. Revoking a refresh token cascades to its active access tokens.',
+    hidden: true,
   },
   access: {
     create: isAuthenticated,
