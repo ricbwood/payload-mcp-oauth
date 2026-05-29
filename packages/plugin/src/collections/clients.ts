@@ -6,9 +6,10 @@ export const oauthClientsCollection: CollectionConfig = {
   slug: 'oauth-clients',
   admin: {
     useAsTitle: 'clientName',
-    group: 'OAuth',
-    defaultColumns: ['clientId', 'clientName', 'isActive', 'lastUsedAt'],
-    description: 'OAuth 2.1 clients registered via Dynamic Client Registration (RFC 7591).',
+    group: 'MCP',
+    defaultColumns: ['clientName', 'isActive', 'lastUsedAt', 'clientId'],
+    description:
+      'Apps connected via OAuth. Claude Desktop registers itself automatically — you only need this screen to review or deactivate connections.',
   },
   access: {
     create: isAuthenticated,
@@ -57,7 +58,7 @@ export const oauthClientsCollection: CollectionConfig = {
       type: 'select',
       hasMany: true,
       defaultValue: ['authorization_code', 'refresh_token'],
-      admin: { readOnly: true },
+      admin: { hidden: true },
       options: [
         { label: 'Authorization Code', value: 'authorization_code' },
         { label: 'Refresh Token', value: 'refresh_token' },
@@ -68,31 +69,25 @@ export const oauthClientsCollection: CollectionConfig = {
       type: 'select',
       hasMany: true,
       defaultValue: ['code'],
-      admin: { readOnly: true },
+      admin: { hidden: true },
       options: [{ label: 'Code', value: 'code' }],
     },
     {
       name: 'tokenEndpointAuthMethod',
       type: 'select',
       defaultValue: 'none',
-      admin: { readOnly: true },
+      admin: { hidden: true },
       options: [{ label: 'None (public client)', value: 'none' }],
     },
     {
       name: 'softwareId',
       type: 'text',
-      admin: {
-        description: 'Optional software identifier from RFC 7591.',
-        position: 'sidebar',
-      },
+      admin: { hidden: true },
     },
     {
       name: 'softwareVersion',
       type: 'text',
-      admin: {
-        description: 'Optional software version from RFC 7591.',
-        position: 'sidebar',
-      },
+      admin: { hidden: true },
     },
     {
       name: 'isActive',
