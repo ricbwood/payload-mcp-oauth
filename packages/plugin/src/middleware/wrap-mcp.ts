@@ -37,21 +37,39 @@ export function installOverrideAuth(mcpPluginOptions: MCPPluginConfig, userColle
 }
 
 /**
- * Wraps a PayloadHandler so that OAuthInvalidTokenError thrown by overrideAuth
- * is caught and converted to a spec-compliant 401 response instead of a 500.
+ * Wraps a PayloadHandler so that:
+ * - OAuthInvalidTokenError thrown by overrideAuth is converted to a spec-compliant 401
+ * - Any 401 from the underlying MCP handler gets resource_metadata appended to
+ *   WWW-Authenticate per RFC 9728, enabling client AS discovery
  */
 export function wrapMcpEndpointHandler(
   original: (req: PayloadRequest) => Promise<Response> | Response,
+  issuer: string,
 ): (req: PayloadRequest) => Promise<Response> {
+  const prmUrl = `${issuer.replace(/\/$/, '')}/.well-known/oauth-protected-resource`
+
+  function addResourceMetadata(wwwAuth: string | null): string {
+    const resourceMeta = `resource_metadata="${prmUrl}"`
+    if (!wwwAuth) return `Bearer ${resourceMeta}`
+    if (wwwAuth.includes('resource_metadata=')) return wwwAuth
+    return `${wwwAuth}, ${resourceMeta}`
+  }
+
   return async (req) => {
     try {
-      return await original(req)
+      const res = await original(req)
+      if (res.status === 401) {
+        const headers = new Headers(res.headers)
+        headers.set('WWW-Authenticate', addResourceMetadata(res.headers.get('WWW-Authenticate')))
+        return new Response(res.body, { status: 401, statusText: res.statusText, headers })
+      }
+      return res
     } catch (err) {
       if (err instanceof OAuthInvalidTokenError) {
         return new Response(null, {
           status: 401,
           headers: {
-            'WWW-Authenticate': 'Bearer error="invalid_token", error_description="OAuth token is invalid or expired"',
+            'WWW-Authenticate': `Bearer error="invalid_token", error_description="OAuth token is invalid or expired", resource_metadata="${prmUrl}"`,
             'Cache-Control': 'no-store',
           },
         })

@@ -126,9 +126,10 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
   installOverrideAuth(resolved.mcpPluginOptions, resolved.userCollection)
 
   // T5.4: wrap MCP endpoint handlers to convert OAuthInvalidTokenError → 401
+  // and to inject resource_metadata into any 401 responses (RFC 9728)
   for (const endpoint of mcpEndpoints) {
     if (typeof endpoint.handler === 'function') {
-      endpoint.handler = wrapMcpEndpointHandler(endpoint.handler)
+      endpoint.handler = wrapMcpEndpointHandler(endpoint.handler, resolved.issuer)
     }
   }
 

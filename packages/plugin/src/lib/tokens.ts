@@ -91,6 +91,7 @@ export async function rotateRefreshToken(
       and: [
         { tokenHash: { equals: tokenHash } },
         { tokenType: { equals: 'refresh' } },
+        { clientId: { equals: params.clientId } },
       ],
     },
     limit: 1,
