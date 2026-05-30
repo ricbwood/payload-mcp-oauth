@@ -11,7 +11,7 @@ import { makeRegisterHandler } from './endpoints/register.js'
 import { makeRevokeHandler } from './endpoints/revoke.js'
 import { makeTokenHandler } from './endpoints/token.js'
 import { createRateLimitStore, rateLimitKey } from './middleware/rate-limit.js'
-import { installOverrideAuth, wrapMcpEndpointHandler } from './middleware/wrap-mcp.js'
+import { wrapMcpEndpointHandler } from './middleware/wrap-mcp.js'
 import { PayloadMcpOAuthError } from './types.js'
 
 const SUPPORTED_MCP_RANGE = { min: [3, 0, 0], max: [3, 999, 999] } as const
@@ -121,9 +121,6 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
   const resolved = resolveConfig(options)
   const mcpEndpoints = detectMcpEndpoints(incomingConfig)
   warnIfVersionUntested()
-
-  // T5.4: install overrideAuth on the shared MCP options reference
-  installOverrideAuth(resolved.mcpPluginOptions, resolved.userCollection)
 
   // T5.4: wrap MCP endpoint handlers to convert OAuthInvalidTokenError → 401
   // and to inject resource_metadata into any 401 responses (RFC 9728)

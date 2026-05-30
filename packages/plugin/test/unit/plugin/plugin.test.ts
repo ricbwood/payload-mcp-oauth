@@ -95,10 +95,14 @@ describe('buildPlugin — endpoints (T5.5)', () => {
   })
 })
 
-describe('buildPlugin — overrideAuth installation (T5.4)', () => {
-  it('sets overrideAuth on the shared mcpPluginOptions reference', () => {
+describe('payloadMcpOAuth — overrideAuth installation (T5.4)', () => {
+  it('sets overrideAuth on mcpPluginOptions eagerly (before plugin execution)', async () => {
+    // overrideAuth must be set during payloadMcpOAuth() call, not deferred to plugin execution,
+    // because Payload's definePlugin spreads mcpPluginOptions into a new object when it runs
+    // the plugin — so mutations applied after that point are invisible to the MCP handler closure.
+    const { payloadMcpOAuth } = await import('../../../src/index.js')
     const mcpOpts = {}
-    buildPlugin(makeConfig(), makeOptions({ mcpPluginOptions: mcpOpts }))
+    payloadMcpOAuth(makeOptions({ mcpPluginOptions: mcpOpts }))
     expect(typeof (mcpOpts as Record<string, unknown>)['overrideAuth']).toBe('function')
   })
 })

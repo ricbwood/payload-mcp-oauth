@@ -19,15 +19,15 @@ export function installOverrideAuth(mcpPluginOptions: MCPPluginConfig, userColle
       return getDefaultMcpAccessSettings()
     }
 
-    req.payload.logger.info(`[pmoauth] overrideAuth: validating token prefix=${bearer.slice(0, 18)}`)
+    req.payload.logger?.info(`[pmoauth] overrideAuth: validating token prefix=${bearer.slice(0, 18)}`)
 
     const ctx = await validateAccessToken(req.payload, bearer)
     if (!ctx) {
-      req.payload.logger.warn('[pmoauth] overrideAuth: validateAccessToken returned null — token not found/expired/revoked')
+      req.payload.logger?.warn('[pmoauth] overrideAuth: validateAccessToken returned null — token not found/expired/revoked')
       throw new OAuthInvalidTokenError()
     }
 
-    req.payload.logger.info(`[pmoauth] overrideAuth: token valid, userId=${ctx.userId}, fetching user`)
+    req.payload.logger?.info(`[pmoauth] overrideAuth: token valid, userId=${ctx.userId}, fetching user`)
 
     let user
     try {
@@ -37,16 +37,16 @@ export function installOverrideAuth(mcpPluginOptions: MCPPluginConfig, userColle
         id: ctx.userId,
       })
     } catch (err) {
-      req.payload.logger.error(`[pmoauth] overrideAuth: findByID failed for userId=${ctx.userId}: ${String(err)}`)
+      req.payload.logger?.error(`[pmoauth] overrideAuth: findByID failed for userId=${ctx.userId}: ${String(err)}`)
       throw new OAuthInvalidTokenError()
     }
 
     if (!user) {
-      req.payload.logger.warn(`[pmoauth] overrideAuth: user not found for userId=${ctx.userId}`)
+      req.payload.logger?.warn(`[pmoauth] overrideAuth: user not found for userId=${ctx.userId}`)
       throw new OAuthInvalidTokenError()
     }
 
-    req.payload.logger.info(`[pmoauth] overrideAuth: success, returning MCPAccessSettings`)
+    req.payload.logger?.info(`[pmoauth] overrideAuth: success, returning MCPAccessSettings`)
 
     return {
       user: user as TypedUser,
