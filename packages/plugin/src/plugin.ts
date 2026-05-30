@@ -16,6 +16,25 @@ import { PayloadMcpOAuthError } from './types.js'
 
 const SUPPORTED_MCP_RANGE = { min: [3, 0, 0], max: [3, 999, 999] } as const
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Max-Age': '86400',
+}
+
+function withCors(handler: (req: PayloadRequest) => Promise<Response> | Response) {
+  return async (req: PayloadRequest): Promise<Response> => {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: CORS_HEADERS })
+    }
+    const res = await handler(req as never)
+    const headers = new Headers(res.headers)
+    headers.set('Access-Control-Allow-Origin', '*')
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers })
+  }
+}
+
 function resolveConfig(options: PayloadMcpOAuthConfig): ResolvedConfig {
   const { issuer, mcpPluginOptions } = options
 
@@ -138,6 +157,8 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     }
   }
 
+  const corsPreflightHandler = () => new Response(null, { status: 204, headers: CORS_HEADERS })
+
   // T5.5: build OAuth endpoints
   const oauthEndpoints: Endpoint[] = [
     {
@@ -153,8 +174,9 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     {
       path: '/oauth/register',
       method: 'post',
-      handler: withRateLimit(rateLimits.register, 'client_name', makeRegisterHandler()),
+      handler: withCors(withRateLimit(rateLimits.register, 'client_name', makeRegisterHandler())),
     },
+    { path: '/oauth/register', method: 'options', handler: corsPreflightHandler },
     {
       path: '/oauth/authorize',
       method: 'get',
@@ -163,18 +185,20 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     {
       path: '/oauth/consent',
       method: 'post',
-      handler: makeConsentHandler(),
+      handler: makeConsentHandler(resolved.authCodeTtlSeconds, resolved.issuer),
     },
     {
       path: '/oauth/token',
       method: 'post',
-      handler: withRateLimit(rateLimits.token, 'client_id', makeTokenHandler()),
+      handler: withCors(withRateLimit(rateLimits.token, 'client_id', makeTokenHandler())),
     },
+    { path: '/oauth/token', method: 'options', handler: corsPreflightHandler },
     {
       path: '/oauth/revoke',
       method: 'post',
-      handler: withRateLimit(rateLimits.revoke, 'client_id', makeRevokeHandler()),
+      handler: withCors(withRateLimit(rateLimits.revoke, 'client_id', makeRevokeHandler())),
     },
+    { path: '/oauth/revoke', method: 'options', handler: corsPreflightHandler },
   ]
 
   // T6.2 / T6.3: register admin views

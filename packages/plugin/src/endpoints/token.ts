@@ -5,26 +5,31 @@ import { oauthErrorResponse, jsonResponse, parseBody } from './helpers.js'
 
 export function makeTokenHandler(): PayloadHandler {
   return async (req) => {
-    if (req.method !== 'POST') {
-      return oauthErrorResponse(405, 'invalid_request', 'Method not allowed')
+    try {
+      if (req.method !== 'POST') {
+        return oauthErrorResponse(405, 'invalid_request', 'Method not allowed')
+      }
+
+      const body = await parseBody(req)
+      const grantType = body['grant_type'] as string | undefined
+
+      if (!grantType) {
+        return oauthErrorResponse(400, 'invalid_request', 'grant_type is required')
+      }
+
+      if (grantType === 'authorization_code') {
+        return await handleAuthCode(req, body)
+      }
+
+      if (grantType === 'refresh_token') {
+        return await handleRefresh(req, body)
+      }
+
+      return oauthErrorResponse(400, 'unsupported_grant_type', `Unsupported grant_type: ${grantType}`)
+    } catch (err) {
+      console.error('[pmoauth] token endpoint error:', err)
+      return oauthErrorResponse(500, 'server_error', 'An internal server error occurred')
     }
-
-    const body = await parseBody(req)
-    const grantType = body['grant_type'] as string | undefined
-
-    if (!grantType) {
-      return oauthErrorResponse(400, 'invalid_request', 'grant_type is required')
-    }
-
-    if (grantType === 'authorization_code') {
-      return handleAuthCode(req, body)
-    }
-
-    if (grantType === 'refresh_token') {
-      return handleRefresh(req, body)
-    }
-
-    return oauthErrorResponse(400, 'unsupported_grant_type', `Unsupported grant_type: ${grantType}`)
   }
 }
 

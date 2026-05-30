@@ -1,0 +1,43 @@
+# Firebase App Hosting configuration
+# https://firebase.google.com/docs/app-hosting/configure
+
+runConfig:
+  runtime: nodejs22
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 1024
+  minInstances: 0
+  maxInstances: 10
+
+env:
+  - variable: DATABASE_URL
+    secret: DATABASE_URL
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: TURSO_AUTH_TOKEN
+    secret: TURSO_AUTH_TOKEN
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PAYLOAD_SECRET
+    secret: PAYLOAD_SECRET
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: PMOAUTH_TOKEN_PEPPER
+    secret: PMOAUTH_TOKEN_PEPPER
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Update this to your real Firebase App Hosting URL after first deploy,
+  # then redeploy. NEXT_PUBLIC_* vars are baked in at build time.
+  - variable: NEXT_PUBLIC_SERVER_URL
+    value: https://payload-test--brainweb-operations.europe-west4.hosted.app/
+    availability:
+      - BUILD
+      - RUNTIME

@@ -26,6 +26,7 @@ function buildConsentHtml(p: {
   codeChallengeMethod: string
   state: string
   userId: string
+  resource: string
 }): string {
   const labels = p.scope.trim()
     ? p.scope.split(/\s+/).filter(Boolean).map((s) => SCOPE_LABELS[s] ?? s)
@@ -56,6 +57,7 @@ h1{font-size:1.25rem;margin-bottom:0.5rem}
 <input type="hidden" name="state" value="${e(p.state)}">
 <input type="hidden" name="user_id" value="${e(p.userId)}">
 <input type="hidden" name="scope" value="${e(p.scope)}">
+<input type="hidden" name="resource" value="${e(p.resource)}">
 <div class="actions">
 <button type="submit" name="decision" value="approve" class="btn btn-approve">Approve</button>
 <button type="submit" name="decision" value="deny" class="btn btn-deny">Deny</button>
@@ -85,6 +87,7 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
     const codeChallengeMethod = q['code_challenge_method']
     const state = q['state']
     const scope = q['scope'] ?? ''
+    const resource = q['resource'] ?? ''
 
     if (responseType !== 'code') {
       return errorRedirect(null, 'unsupported_response_type', 'Only response_type=code is supported', state)
@@ -140,7 +143,7 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
     const clientName = String(client['clientName'] ?? clientId)
     const userId = String((user as Record<string, unknown>)['id'] ?? '')
 
-    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId }), {
+    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId, resource }), {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',

@@ -1,0 +1,13 @@
+{
+  "apphosting": {
+    "backendId": "payload-test",
+    "rootDir": "examples/payload-app",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "functions"
+    ]
+  }
+}
