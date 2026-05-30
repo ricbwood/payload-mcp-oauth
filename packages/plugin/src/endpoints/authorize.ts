@@ -151,7 +151,11 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
         'X-Frame-Options': 'DENY',
         'X-Content-Type-Options': 'nosniff',
         'Referrer-Policy': 'no-referrer',
-        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'",
+        // form-action omitted intentionally: Chrome blocks form-POST redirects to
+        // origins not in form-action, and the consent redirect goes to the client's
+        // localhost callback (random port). default-src 'none' already blocks XSS,
+        // so form-action adds no practical security here.
+        'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'",
       },
     })
   }
