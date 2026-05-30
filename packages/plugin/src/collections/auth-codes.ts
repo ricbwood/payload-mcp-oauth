@@ -30,7 +30,7 @@ const sweepExpiredCodes: CollectionAfterChangeHook = async ({ operation, req }) 
 
   await Promise.all(
     toDelete.map((id) =>
-      req.payload.delete({ collection: 'oauth-auth-codes', id, req }),
+      req.payload.delete({ collection: 'oauth-auth-codes', id, req }).catch(() => undefined),
     ),
   )
 }
