@@ -132,9 +132,21 @@ importers:
       '@payloadcms/plugin-mcp':
         specifier: 3.85.0
         version: 3.85.0(next@16.2.6(@playwright/test@1.58.2)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.7.3))
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.14)
       payload:
         specifier: 3.85.0
         version: 3.85.0(graphql@16.14.0)(typescript@5.7.3)
+      react:
+        specifier: 19.2.6
+        version: 19.2.6
+      react-dom:
+        specifier: 19.2.6
+        version: 19.2.6(react@19.2.6)
       tsup:
         specifier: 8.3.5
         version: 8.3.5(jiti@2.6.1)(postcss@8.5.15)(tsx@4.21.0)(typescript@5.7.3)(yaml@2.9.0)
