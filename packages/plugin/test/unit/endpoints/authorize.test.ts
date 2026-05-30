@@ -91,11 +91,13 @@ describe('makeAuthorizeHandler', () => {
     expect(res.headers.get('Location')).toContain('error=invalid_request')
   })
 
-  it('rejects missing state', async () => {
+  it('renders consent HTML when state is absent (state is optional per OAuth 2.1)', async () => {
     const res = await makeAuthorizeHandler()(
       makeReq({ ...VALID_QUERY, state: undefined }, { id: 'u1' }) as never,
     )
-    expect(res.headers.get('Location')).toContain('error=invalid_request')
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('Test App')
   })
 
   it('sets security headers on consent HTML', async () => {

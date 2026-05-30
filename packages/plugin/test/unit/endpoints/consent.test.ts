@@ -82,4 +82,13 @@ describe('makeConsentHandler', () => {
     const res = await makeConsentHandler()(makeReq(VALID_BODY, 'GET') as never)
     expect(res.status).toBe(405)
   })
+
+  it('issues code without state when state is absent (state is optional per OAuth 2.1)', async () => {
+    const { state: _omit, ...bodyWithoutState } = VALID_BODY
+    const res = await makeConsentHandler()(makeReq(bodyWithoutState) as never)
+    expect(res.status).toBe(302)
+    const location = res.headers.get('Location') ?? ''
+    expect(location).toContain('code=pmoauth_ac_')
+    expect(location).not.toContain('state=')
+  })
 })

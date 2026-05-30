@@ -24,7 +24,7 @@ function buildConsentHtml(p: {
   redirectUri: string
   codeChallenge: string
   codeChallengeMethod: string
-  state: string
+  state: string | undefined
   userId: string
   resource: string
 }): string {
@@ -54,7 +54,7 @@ h1{font-size:1.25rem;margin-bottom:0.5rem}
 <input type="hidden" name="redirect_uri" value="${e(p.redirectUri)}">
 <input type="hidden" name="code_challenge" value="${e(p.codeChallenge)}">
 <input type="hidden" name="code_challenge_method" value="${e(p.codeChallengeMethod)}">
-<input type="hidden" name="state" value="${e(p.state)}">
+<input type="hidden" name="state" value="${e(p.state ?? '')}">
 <input type="hidden" name="user_id" value="${e(p.userId)}">
 <input type="hidden" name="scope" value="${e(p.scope)}">
 <input type="hidden" name="resource" value="${e(p.resource)}">
@@ -122,10 +122,7 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
       return errorRedirect(redirectUri, 'invalid_request', 'code_challenge_method must be S256', state)
     }
 
-    if (!state || typeof state !== 'string') {
-      return errorRedirect(redirectUri, 'invalid_request', 'state is required', state)
-    }
-
+    // state is RECOMMENDED but optional per OAuth 2.1 — do not reject absent state
     const user = req.user
     if (!user) {
       const resolvedLogin = loginPath ?? `${adminPath}/login`

@@ -21,7 +21,7 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
       const scope = (body['scope'] as string | undefined) ?? ''
       const resource = (body['resource'] as string | undefined) ?? ''
 
-      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !state || !userId) {
+      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !userId) {
         return oauthErrorResponse(400, 'invalid_request', 'Missing required consent parameters')
       }
 
@@ -29,7 +29,7 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
         const url = new URL(redirectUri)
         url.searchParams.set('error', 'access_denied')
         url.searchParams.set('error_description', 'The user denied the authorization request')
-        url.searchParams.set('state', state)
+        if (state) url.searchParams.set('state', state)
         return redirectResponse(url.toString())
       }
 
@@ -68,7 +68,7 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
 
       const url = new URL(redirectUri)
       url.searchParams.set('code', code)
-      url.searchParams.set('state', state)
+      if (state) url.searchParams.set('state', state)
       // RFC 9207: include iss so clients can verify the authorization server identity
       if (issuer) url.searchParams.set('iss', issuer)
       // RFC 8707: echo resource back to the client unchanged
