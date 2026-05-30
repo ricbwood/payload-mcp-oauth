@@ -24,7 +24,12 @@ export function middleware(request: NextRequest) {
   // silently misbehave; respond with a structured 404 + JSON-RPC error so the
   // failure is loud and the correct endpoint is discoverable.
   if (nextUrl.pathname === '/' && method === 'POST' && looksLikeMcpClient(request)) {
-    const mcpUrl = `${nextUrl.origin}${MCP_ENDPOINT_PATH}`
+    // nextUrl.origin reflects the internal Cloud Run container address on
+    // Firebase App Hosting; derive the public URL from forwarded headers.
+    const forwardedHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+    const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https'
+    const publicOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : nextUrl.origin
+    const mcpUrl = `${publicOrigin}${MCP_ENDPOINT_PATH}`
     console.warn(`[mcp-misconfig] POST / from MCP-shaped client — redirecting hint to ${mcpUrl}`)
     return NextResponse.json(
       {
