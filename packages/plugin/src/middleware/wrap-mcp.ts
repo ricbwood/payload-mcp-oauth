@@ -114,6 +114,7 @@ export function installOverrideAuth(mcpPluginOptions: MCPPluginConfig, userColle
 export function wrapMcpEndpointHandler(
   original: (req: PayloadRequest) => Promise<Response> | Response,
   issuer: string,
+  canonicalPathname?: string,
 ): (req: PayloadRequest) => Promise<Response> {
   const prmUrl = `${issuer.replace(/\/$/, '')}/.well-known/oauth-protected-resource`
 
@@ -125,8 +126,31 @@ export function wrapMcpEndpointHandler(
   }
 
   return async (req) => {
+    // After a Next.js middleware rewrite (e.g. POST / → /api/mcp), Payload's
+    // routing matches but req.url still has the original pathname. The MCP
+    // handler downstream does `url.pathname === '/api/mcp'` and returns 404
+    // if it doesn't match. Wrap req in a Proxy that overrides `url` so the
+    // rewritten request behaves identically to a direct hit on the endpoint.
+    let effectiveReq = req
+    if (canonicalPathname && req.url) {
+      try {
+        const u = new URL(req.url)
+        if (u.pathname !== canonicalPathname) {
+          u.pathname = canonicalPathname
+          const patchedUrl = u.toString()
+          effectiveReq = new Proxy(req, {
+            get(target, prop, receiver) {
+              if (prop === 'url') return patchedUrl
+              return Reflect.get(target, prop, receiver)
+            },
+          })
+        }
+      } catch {
+        // req.url not absolute — leave as-is
+      }
+    }
     try {
-      const res = await original(req)
+      const res = await original(effectiveReq)
       if (res.status === 401) {
         const headers = new Headers(res.headers)
         headers.set('WWW-Authenticate', addResourceMetadata(res.headers.get('WWW-Authenticate')))

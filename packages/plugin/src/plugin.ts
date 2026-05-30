@@ -123,10 +123,17 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
   warnIfVersionUntested()
 
   // T5.4: wrap MCP endpoint handlers to convert OAuthInvalidTokenError → 401
-  // and to inject resource_metadata into any 401 responses (RFC 9728)
+  // and to inject resource_metadata into any 401 responses (RFC 9728).
+  // Pass the canonical full pathname (e.g. /api/mcp) so the wrapper can patch
+  // req.url after a Next.js middleware rewrite, otherwise the downstream
+  // mcp-handler URL match (url.pathname === streamableHttpEndpoint) fails.
+  const apiBase = (incomingConfig.routes?.api ?? '/api').replace(/\/$/, '')
   for (const endpoint of mcpEndpoints) {
     if (typeof endpoint.handler === 'function') {
-      endpoint.handler = wrapMcpEndpointHandler(endpoint.handler, resolved.issuer)
+      const endpointPath = endpoint.path.startsWith('/api/')
+        ? endpoint.path
+        : `${apiBase}${endpoint.path.startsWith('/') ? endpoint.path : `/${endpoint.path}`}`
+      endpoint.handler = wrapMcpEndpointHandler(endpoint.handler, resolved.issuer, endpointPath)
     }
   }
 
