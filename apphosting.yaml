@@ -34,10 +34,14 @@ env:
       - BUILD
       - RUNTIME
 
-  # Update this to your real Firebase App Hosting URL after first deploy,
-  # then redeploy. NEXT_PUBLIC_* vars are baked in at build time.
   - variable: NEXT_PUBLIC_SERVER_URL
     value: https://payload-test--brainweb-operations.europe-west4.hosted.app/
     availability:
       - BUILD
       - RUNTIME
+
+  # Tells the Next.js buildpack where to find the app in this monorepo
+  - variable: GOOGLE_BUILDABLE
+    value: examples/payload-app
+    availability:
+      - BUILD

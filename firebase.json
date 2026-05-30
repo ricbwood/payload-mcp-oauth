@@ -1,7 +1,7 @@
 {
   "apphosting": {
     "backendId": "payload-test",
-    "rootDir": "examples/payload-app",
+    "rootDir": ".",
     "ignore": [
       "node_modules",
       ".git",
