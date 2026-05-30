@@ -21,6 +21,7 @@ export async function validateAccessToken(
 
   const { docs } = await payload.find({
     collection: 'oauth-tokens',
+    overrideAccess: true,
     where: {
       and: [
         { tokenHash: { equals: tokenHash } },
@@ -40,6 +41,7 @@ export async function validateAccessToken(
   payload
     .update({
       collection: 'oauth-tokens',
+      overrideAccess: true,
       id: token.id,
       data: { lastUsedAt: new Date().toISOString() },
     })

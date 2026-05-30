@@ -21,6 +21,7 @@ export function makeRevokeHandler(): PayloadHandler {
 
     const { docs } = await req.payload.find({
       collection: 'oauth-tokens',
+      overrideAccess: true,
       where: { tokenHash: { equals: hash } },
       limit: 1,
     })
@@ -41,6 +42,7 @@ export function makeRevokeHandler(): PayloadHandler {
     const now = new Date().toISOString()
     await req.payload.update({
       collection: 'oauth-tokens',
+      overrideAccess: true,
       id: String(doc['id']),
       data: { revokedAt: now },
     })
@@ -48,6 +50,7 @@ export function makeRevokeHandler(): PayloadHandler {
     if (doc['tokenType'] === 'refresh') {
       const { docs: accessDocs } = await req.payload.find({
         collection: 'oauth-tokens',
+        overrideAccess: true,
         where: {
           parentTokenId: { equals: String(doc['id']) },
           revokedAt: { equals: null },
@@ -58,6 +61,7 @@ export function makeRevokeHandler(): PayloadHandler {
         accessDocs.map((ad) =>
           req.payload.update({
             collection: 'oauth-tokens',
+            overrideAccess: true,
             id: String(ad['id']),
             data: { revokedAt: now },
           }),

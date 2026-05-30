@@ -39,6 +39,7 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
 
       const { docs } = await req.payload.find({
         collection: 'oauth-clients',
+        overrideAccess: true,
         where: { clientId: { equals: clientId }, isActive: { equals: true } },
         limit: 1,
       })

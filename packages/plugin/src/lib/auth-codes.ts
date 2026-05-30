@@ -29,6 +29,7 @@ export async function issueAuthCode(payload: Payload, params: IssueAuthCodeParam
 
   await payload.create({
     collection: 'oauth-auth-codes',
+    overrideAccess: true,
     data: { codeHash, clientId, userId, redirectUri, scope, codeChallenge, codeChallengeMethod, expiresAt },
   })
 
@@ -44,6 +45,7 @@ export async function consumeAuthCode(
 
   const { docs } = await payload.find({
     collection: 'oauth-auth-codes',
+    overrideAccess: true,
     where: { codeHash: { equals: codeHash } },
     limit: 1,
     pagination: false,
@@ -68,6 +70,7 @@ export async function consumeAuthCode(
   // Mark consumed — any subsequent request finding this code will see consumedAt set
   await payload.update({
     collection: 'oauth-auth-codes',
+    overrideAccess: true,
     id: code.id,
     data: { consumedAt: new Date().toISOString() },
   })

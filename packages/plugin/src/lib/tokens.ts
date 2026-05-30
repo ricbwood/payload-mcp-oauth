@@ -43,6 +43,7 @@ export async function issueTokenPair(payload: Payload, params: IssueTokenPairPar
 
   await payload.create({
     collection: 'oauth-tokens',
+    overrideAccess: true,
     data: {
       tokenHash: hashToken(accessPlaintext),
       tokenType: 'access',
@@ -57,6 +58,7 @@ export async function issueTokenPair(payload: Payload, params: IssueTokenPairPar
 
   await payload.create({
     collection: 'oauth-tokens',
+    overrideAccess: true,
     data: {
       tokenHash: hashToken(refreshPlaintext),
       tokenType: 'refresh',
@@ -87,6 +89,7 @@ export async function rotateRefreshToken(
 
   const { docs } = await payload.find({
     collection: 'oauth-tokens',
+    overrideAccess: true,
     where: {
       and: [
         { tokenHash: { equals: tokenHash } },
@@ -114,6 +117,7 @@ export async function rotateRefreshToken(
   // Revoke the consumed refresh token
   await payload.update({
     collection: 'oauth-tokens',
+    overrideAccess: true,
     id: token.id,
     data: { revokedAt: new Date().toISOString() },
   })
@@ -133,6 +137,7 @@ export async function rotateRefreshToken(
 async function revokeAllForClientUser(payload: Payload, clientId: string, userId: string): Promise<void> {
   const { docs } = await payload.find({
     collection: 'oauth-tokens',
+    overrideAccess: true,
     where: {
       and: [
         { clientId: { equals: clientId } },
@@ -149,6 +154,7 @@ async function revokeAllForClientUser(payload: Payload, clientId: string, userId
     docs.map((t) =>
       payload.update({
         collection: 'oauth-tokens',
+        overrideAccess: true,
         id: t.id,
         data: { revokedAt },
       }),

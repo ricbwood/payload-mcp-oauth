@@ -26,6 +26,7 @@ export function installOverrideAuth(mcpPluginOptions: MCPPluginConfig, userColle
 
     const user = await req.payload.findByID({
       collection: userCollection,
+      overrideAccess: true,
       id: ctx.userId,
     })
 

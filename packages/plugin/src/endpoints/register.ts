@@ -64,6 +64,7 @@ export function makeRegisterHandler(): PayloadHandler {
 
     await req.payload.create({
       collection: 'oauth-clients',
+      overrideAccess: true,
       data: {
         clientId,
         clientName: trimmedName,

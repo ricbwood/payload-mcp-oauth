@@ -99,6 +99,7 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
 
     const { docs } = await req.payload.find({
       collection: 'oauth-clients',
+      overrideAccess: true,
       where: { clientId: { equals: clientId }, isActive: { equals: true } },
       limit: 1,
     })
