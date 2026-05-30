@@ -8,6 +8,7 @@
   "scripts": {
     "prebuild": "pnpm --filter @brainweb/payload-plugin-mcp-oauth build",
     "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build",
+    "postbuild": "node scripts/fix-standalone.mjs",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
     "devsafe": "rm -rf .next && cross-env NODE_OPTIONS=--no-deprecation next dev",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
