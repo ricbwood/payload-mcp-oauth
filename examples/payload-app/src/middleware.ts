@@ -19,36 +19,15 @@ export function middleware(request: NextRequest) {
     console.log(`[oauth-middleware] ${method} ${nextUrl.pathname}${nextUrl.search}`)
   }
 
-  // Catch MCP clients that were configured with the bare host URL instead of
-  // the full /api/mcp endpoint URL. Returning 200 with HTML lets the client
-  // silently misbehave; respond with a structured 404 + JSON-RPC error so the
-  // failure is loud and the correct endpoint is discoverable.
+  // MCP clients registered with the bare host URL (no /api/mcp suffix) POST
+  // their JSON-RPC payloads to the root, which Next.js otherwise answers with
+  // the home page HTML (200). Internally rewrite to /api/mcp so the bare-host
+  // form Just Works while the request body, method, and headers are preserved.
   if (nextUrl.pathname === '/' && method === 'POST' && looksLikeMcpClient(request)) {
-    // nextUrl.origin reflects the internal Cloud Run container address on
-    // Firebase App Hosting; derive the public URL from forwarded headers.
-    const forwardedHost = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
-    const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'https'
-    const publicOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : nextUrl.origin
-    const mcpUrl = `${publicOrigin}${MCP_ENDPOINT_PATH}`
-    console.warn(`[mcp-misconfig] POST / from MCP-shaped client — redirecting hint to ${mcpUrl}`)
-    return NextResponse.json(
-      {
-        jsonrpc: '2.0',
-        id: null,
-        error: {
-          code: -32000,
-          message: `MCP endpoint is not at the root path. Update your connector URL to: ${mcpUrl}`,
-          data: { mcp_endpoint: mcpUrl },
-        },
-      },
-      {
-        status: 404,
-        headers: {
-          'Cache-Control': 'no-store',
-          'X-MCP-Endpoint': mcpUrl,
-        },
-      },
-    )
+    console.log(`[mcp-rewrite] POST / → ${MCP_ENDPOINT_PATH}`)
+    const rewritten = nextUrl.clone()
+    rewritten.pathname = MCP_ENDPOINT_PATH
+    return NextResponse.rewrite(rewritten)
   }
 
   return NextResponse.next()
