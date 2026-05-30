@@ -132,4 +132,72 @@ describe('installOverrideAuth', () => {
     await expect(opts.overrideAuth!(req as never, getDefault)).rejects.toThrow(OAuthInvalidTokenError)
     expect(getDefault).not.toHaveBeenCalled()
   })
+
+  it('returns MCPAccessSettings with capabilities derived from mcpPluginOptions when token stores none', async () => {
+    const opts = {
+      collections: {
+        users: { enabled: { find: true, create: false, update: true, delete: false } },
+        'oauth-clients': { enabled: true },
+      },
+    } as Parameters<typeof installOverrideAuth>[0]
+    installOverrideAuth(opts, 'users')
+
+    const tokenDoc = {
+      id: 'tok-1',
+      tokenHash: 'anyhash',
+      tokenType: 'access',
+      userId: 'user-1',
+      clientId: 'client-1',
+      scope: 'mcp',
+      capabilities: {},
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      revokedAt: null,
+    }
+    const payload = {
+      find: vi.fn().mockResolvedValue({ docs: [tokenDoc] }),
+      findByID: vi.fn().mockResolvedValue({ id: 'user-1', email: 'a@b.com' }),
+      update: vi.fn().mockResolvedValue({}),
+    }
+    const req = {
+      headers: { get: vi.fn().mockReturnValue('Bearer pmoauth_at_sometoken12345678901234567890123') },
+      payload,
+    }
+    const getDefault = vi.fn()
+    const result = await opts.overrideAuth!(req as never, getDefault)
+
+    expect(result.user).toBeDefined()
+    expect((result as Record<string, unknown>).users).toEqual({ find: true, create: false, update: true, delete: false })
+    expect((result as Record<string, unknown>).oauthClients).toEqual({ find: true, create: true, update: true, delete: true })
+    expect(getDefault).not.toHaveBeenCalled()
+  })
+
+  it('sets user.collection and user._strategy on the returned user', async () => {
+    const opts = {} as Parameters<typeof installOverrideAuth>[0]
+    installOverrideAuth(opts, 'users')
+
+    const tokenDoc = {
+      id: 'tok-2',
+      tokenHash: 'anyhash2',
+      tokenType: 'access',
+      userId: 'user-2',
+      clientId: 'client-1',
+      scope: 'mcp',
+      capabilities: {},
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      revokedAt: null,
+    }
+    const payload = {
+      find: vi.fn().mockResolvedValue({ docs: [tokenDoc] }),
+      findByID: vi.fn().mockResolvedValue({ id: 'user-2', email: 'b@c.com' }),
+      update: vi.fn().mockResolvedValue({}),
+    }
+    const req = {
+      headers: { get: vi.fn().mockReturnValue('Bearer pmoauth_at_anothertoken1234567890123456789012') },
+      payload,
+    }
+    const result = await opts.overrideAuth!(req as never, vi.fn())
+    const u = result.user as Record<string, unknown>
+    expect(u['collection']).toBe('users')
+    expect(u['_strategy']).toBe('local-jwt')
+  })
 })

@@ -4,6 +4,44 @@ import { UnauthorizedError } from 'payload'
 import { validateAccessToken } from '../lib/validate.js'
 import { OAuthInvalidTokenError } from '../types.js'
 
+// Matches the toCamelCase used by @payloadcms/plugin-mcp for capability key lookup
+function toCamelCase(str: string): string {
+  return str
+    .replace(/[-_\s]+(.)?/g, (_, chr: string) => (chr ? chr.toUpperCase() : ''))
+    .replace(/^(.)/, (_, chr: string) => chr.toLowerCase())
+}
+
+/**
+ * Derives per-collection/global capability flags from the MCP plugin options.
+ * Called when the stored token capabilities are empty (v1 tokens always store {}).
+ * The plugin config is the authoritative source of what the server exposes.
+ */
+function buildCapabilities(mcpPluginOptions: MCPPluginConfig): Record<string, unknown> {
+  const caps: Record<string, unknown> = {}
+
+  for (const [slug, cfg] of Object.entries(mcpPluginOptions.collections ?? {})) {
+    if (!cfg) continue
+    const key = toCamelCase(slug)
+    if (cfg.enabled === true) {
+      caps[key] = { find: true, create: true, update: true, delete: true }
+    } else if (typeof cfg.enabled === 'object' && cfg.enabled !== null) {
+      caps[key] = { ...cfg.enabled }
+    }
+  }
+
+  for (const [slug, cfg] of Object.entries(mcpPluginOptions.globals ?? {})) {
+    if (!cfg) continue
+    const key = toCamelCase(slug)
+    if (cfg.enabled === true) {
+      caps[key] = { find: true, update: true }
+    } else if (typeof cfg.enabled === 'object' && cfg.enabled !== null) {
+      caps[key] = { ...cfg.enabled }
+    }
+  }
+
+  return caps
+}
+
 /**
  * Installs an `overrideAuth` function on the shared MCP plugin options reference.
  * When the Bearer token starts with `pmoauth_`, the OAuth validation path runs;
@@ -47,11 +85,22 @@ export function installOverrideAuth(mcpPluginOptions: MCPPluginConfig, userColle
       throw new OAuthInvalidTokenError()
     }
 
+    // Set collection/strategy metadata so Payload's access-control layer recognises the user,
+    // matching what the API key flow sets before returning from getDefaultMcpAccessSettings.
+    const typedUser = user as TypedUser & Record<string, unknown>
+    typedUser['collection'] = userCollection
+    typedUser['_strategy'] = 'local-jwt'
+
     req.payload.logger?.info(`[pmoauth] overrideAuth: success, returning MCPAccessSettings`)
 
+    // Use stored token capabilities if explicitly set; otherwise derive from plugin config.
+    // Tokens issued by this plugin in v1 always store {} — the plugin config is authoritative.
+    const capabilities =
+      Object.keys(ctx.capabilities).length > 0 ? ctx.capabilities : buildCapabilities(mcpPluginOptions)
+
     return {
-      user: user as TypedUser,
-      ...ctx.capabilities,
+      user: typedUser as TypedUser,
+      ...capabilities,
     } as MCPAccessSettings
   }
 }

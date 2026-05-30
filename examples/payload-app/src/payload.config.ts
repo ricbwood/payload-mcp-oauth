@@ -14,7 +14,16 @@ import { Media } from './collections/Media'
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-const mcpOptions: MCPPluginConfig = {}
+const mcpOptions: MCPPluginConfig = {
+  collections: {
+    users: {
+      enabled: { find: true, create: false, update: true, delete: false },
+    },
+    media: {
+      enabled: { find: true, create: true, update: false, delete: false },
+    },
+  },
+}
 
 export default buildConfig({
   admin: {
