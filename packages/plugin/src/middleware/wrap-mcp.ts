@@ -1,5 +1,6 @@
 import type { MCPAccessSettings, MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, TypedUser } from 'payload'
+import { UnauthorizedError } from 'payload'
 import { validateAccessToken } from '../lib/validate.js'
 import { OAuthInvalidTokenError } from '../types.js'
 
@@ -89,6 +90,18 @@ export function wrapMcpEndpointHandler(
           status: 401,
           headers: {
             'WWW-Authenticate': `Bearer error="invalid_token", error_description="OAuth token is invalid or expired", resource_metadata="${prmUrl}"`,
+            'Cache-Control': 'no-store',
+          },
+        })
+      }
+      // Payload's MCP handler throws UnauthorizedError when there is no Bearer token or the
+      // API-key path finds nothing. Catch it here so we can return a proper OAuth challenge
+      // with resource_metadata, enabling the client to discover the authorization server.
+      if (err instanceof UnauthorizedError) {
+        return new Response(null, {
+          status: 401,
+          headers: {
+            'WWW-Authenticate': `Bearer resource_metadata="${prmUrl}"`,
             'Cache-Control': 'no-store',
           },
         })

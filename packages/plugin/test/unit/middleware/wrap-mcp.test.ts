@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { installOverrideAuth, wrapMcpEndpointHandler } from '../../../src/middleware/wrap-mcp.js'
 import { OAuthInvalidTokenError } from '../../../src/types.js'
+import { UnauthorizedError } from 'payload'
 
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
 
@@ -58,6 +59,16 @@ describe('wrapMcpEndpointHandler', () => {
     const res = await wrapped({} as never)
     const www = res.headers.get('WWW-Authenticate') ?? ''
     expect(www.split('resource_metadata=').length - 1).toBe(1)
+  })
+
+  it('converts Payload UnauthorizedError to 401 with resource_metadata challenge (no error code)', async () => {
+    const original = vi.fn().mockRejectedValue(new UnauthorizedError())
+    const wrapped = wrapMcpEndpointHandler(original, TEST_ISSUER)
+    const res = await wrapped({} as never)
+    expect(res.status).toBe(401)
+    const www = res.headers.get('WWW-Authenticate') ?? ''
+    expect(www).toContain(`resource_metadata="${TEST_PRM_URL}"`)
+    expect(www).not.toContain('error=')
   })
 
   it('rethrows non-OAuth errors', async () => {
