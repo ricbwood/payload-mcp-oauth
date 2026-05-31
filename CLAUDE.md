@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`@brainweb/payload-plugin-mcp-oauth` is a Payload CMS plugin that adds OAuth 2.1 + PKCE + Dynamic Client Registration to `@payloadcms/plugin-mcp` MCP servers. This enables Payload-backed MCP servers to be used as Custom Connectors in Claude.ai alongside the existing API-key flow.
+`@brainwebuk/payload-plugin-mcp-oauth` is a Payload CMS plugin that adds OAuth 2.1 + PKCE + Dynamic Client Registration to `@payloadcms/plugin-mcp` MCP servers. This enables Payload-backed MCP servers to be used as Custom Connectors in Claude.ai alongside the existing API-key flow.
 
 The plugin is **purely additive** — it wraps the existing MCP endpoint handler and adds OAuth endpoints/collections as a sibling plugin. See `PROJECT_PLAN.md` for the full architecture and phased task breakdown.
 
@@ -12,7 +12,7 @@ The plugin is **purely additive** — it wraps the existing MCP endpoint handler
 
 ```
 .
-├── packages/plugin/          # @brainweb/payload-plugin-mcp-oauth (the published package)
+├── packages/plugin/          # @brainwebuk/payload-plugin-mcp-oauth (the published package)
 │   └── src/                  # Source lives here (to be created per PROJECT_PLAN.md §3)
 ├── examples/payload-app/     # Reference Payload 3 app (SQLite) for integration testing
 ├── tsconfig.base.json        # Shared TS config (strict, ESNext, Bundler resolution)
@@ -39,7 +39,7 @@ pnpm --filter ./examples/payload-app test:integration
 
 # Typecheck
 pnpm typecheck
-pnpm --filter @brainweb/payload-plugin-mcp-oauth typecheck
+pnpm --filter @brainwebuk/payload-plugin-mcp-oauth typecheck
 
 # Lint
 pnpm lint

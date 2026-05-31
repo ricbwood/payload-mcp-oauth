@@ -6,7 +6,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prebuild": "pnpm --filter @brainweb/payload-plugin-mcp-oauth build",
+    "prebuild": "pnpm --filter @brainwebuk/payload-plugin-mcp-oauth build",
     "build": "cross-env NODE_OPTIONS=\"--no-deprecation --max-old-space-size=8000\" next build",
     "postbuild": "node scripts/fix-standalone.mjs",
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
@@ -22,7 +22,7 @@
     "test:integration": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@brainweb/payload-plugin-mcp-oauth": "workspace:*",
+    "@brainwebuk/payload-plugin-mcp-oauth": "workspace:*",
     "@payloadcms/db-sqlite": "3.85.0",
     "@payloadcms/next": "3.85.0",
     "@payloadcms/plugin-mcp": "3.85.0",

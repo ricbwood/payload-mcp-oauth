@@ -1,4 +1,4 @@
-# Threat Model: `@brainweb/payload-plugin-mcp-oauth`
+# Threat Model: `@brainwebuk/payload-plugin-mcp-oauth`
 
 **Method:** STRIDE  
 **Date:** 2026-05-29  

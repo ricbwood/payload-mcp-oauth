@@ -40,7 +40,7 @@ Both checks must pass. If either fails, the startup error is thrown.
 ### 2. Error thrown when plugin order is wrong
 
 ```
-PayloadMcpOAuthError: @brainweb/payload-plugin-mcp-oauth must be registered AFTER @payloadcms/plugin-mcp in your Payload plugins array.
+PayloadMcpOAuthError: @brainwebuk/payload-plugin-mcp-oauth must be registered AFTER @payloadcms/plugin-mcp in your Payload plugins array.
 
   Fix: Change your payload.config.ts plugins array to:
 
@@ -83,7 +83,7 @@ If the installed version is outside this range:
 - **At or above major boundary (`>=4.0.0`):** Log a warning (do not throw — the plugin may still work):
   ```
   [payload-plugin-mcp-oauth] WARNING: @payloadcms/plugin-mcp@{version} is above the tested range (>=3.85.0 <4.0.0).
-  The OAuth plugin may not function correctly. Check for a newer version of @brainweb/payload-plugin-mcp-oauth.
+  The OAuth plugin may not function correctly. Check for a newer version of @brainwebuk/payload-plugin-mcp-oauth.
   ```
   Throwing on a major bump would be overly aggressive — it would break deployments on upgrade before a fix is released. A warning allows the deployer to proceed while being informed.
 

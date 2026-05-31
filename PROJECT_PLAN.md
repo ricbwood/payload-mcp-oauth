@@ -28,7 +28,7 @@ Deliver a production-grade Payload CMS plugin that:
 2. Existing Claude Code / Claude Desktop setups using API keys continue to work without changes.
 3. All security checks in §7 pass on every PR.
 4. Test coverage ≥ 85% on auth-critical modules; ≥ 75% overall.
-5. The package can be installed clean (`pnpm add @brainweb/payload-plugin-mcp-oauth`) and reach a working OAuth handshake in under 15 minutes following the README.
+5. The package can be installed clean (`pnpm add @brainwebuk/payload-plugin-mcp-oauth`) and reach a working OAuth handshake in under 15 minutes following the README.
 
 ---
 
@@ -43,7 +43,7 @@ incomingConfig
 @payloadcms/plugin-mcp   ── registers: collections, MCP endpoint, API-key auth
     │
     ▼
-@brainweb/payload-plugin-mcp-oauth   ── wraps MCP endpoint handler,
+@brainwebuk/payload-plugin-mcp-oauth   ── wraps MCP endpoint handler,
     │                                   adds OAuth endpoints + collections
     ▼
 finalConfig
@@ -91,7 +91,7 @@ OAuth tokens use the prefix `pmoauth_` (Payload-MCP-OAuth). The wrapper checks t
 ├── examples/
 │   └── payload-app/         # Reference Payload 3 app (SQLite) for integration testing
 ├── packages/
-│   └── plugin/              # @brainweb/payload-plugin-mcp-oauth (the published package)
+│   └── plugin/              # @brainwebuk/payload-plugin-mcp-oauth (the published package)
 │       ├── src/
 │       │   ├── index.ts             # Plugin factory
 │       │   ├── plugin.ts            # Config mutation logic
@@ -185,7 +185,7 @@ Each task below is sized for a single code-agent session (roughly 1–4 hours of
 
 **T0.1 — Initialise repository**
 - *Deps:* none.
-- *Objective:* Create the repository with the layout in §3, a `package.json` declaring scope `@brainweb`, MIT license, Node ≥ 20 engine, and `pnpm` as the package manager.
+- *Objective:* Create the repository with the layout in §3, a `package.json` declaring scope `@brainwebuk`, MIT license, Node ≥ 20 engine, and `pnpm` as the package manager.
 - *Deliverable:* Committed initial structure, README stub, LICENSE, `.gitignore`, `.editorconfig`, `.nvmrc`.
 - *Acceptance:* `pnpm install` succeeds on a clean clone.
 
@@ -675,4 +675,4 @@ CI runs unit + integration + security + UI on every PR. Smoke, E2E, and performa
 
 ---
 
-*Plan version 1.0 — Authored as the initial planning artefact for `@brainweb/payload-plugin-mcp-oauth`. Subsequent material decisions belong in `docs/adrs/`. Material changes to this plan itself should be made via PR with the `meta:plan` label.*
+*Plan version 1.0 — Authored as the initial planning artefact for `@brainwebuk/payload-plugin-mcp-oauth`. Subsequent material decisions belong in `docs/adrs/`. Material changes to this plan itself should be made via PR with the `meta:plan` label.*

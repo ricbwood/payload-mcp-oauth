@@ -211,14 +211,14 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     ...(incomingConfig.admin?.components?.views ?? {}),
     'oauth-tokens': {
       Component: {
-        path: '@brainweb/payload-plugin-mcp-oauth/admin',
+        path: '@brainwebuk/payload-plugin-mcp-oauth/admin',
         exportName: 'TokensView',
       },
       path: '/oauth/tokens' as `/${string}`,
     },
     'oauth-clients': {
       Component: {
-        path: '@brainweb/payload-plugin-mcp-oauth/admin',
+        path: '@brainwebuk/payload-plugin-mcp-oauth/admin',
         exportName: 'ClientsView',
       },
       path: '/oauth/clients' as `/${string}`,
