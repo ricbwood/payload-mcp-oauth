@@ -185,7 +185,7 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     {
       path: '/oauth/authorize',
       method: 'get',
-      handler: withRateLimit(rateLimits.authorize, null, makeAuthorizeHandler()),
+      handler: withRateLimit(rateLimits.authorize, null, makeAuthorizeHandler('/admin', undefined, `${apiBase}/oauth/consent`)),
     },
     {
       path: '/oauth/consent',

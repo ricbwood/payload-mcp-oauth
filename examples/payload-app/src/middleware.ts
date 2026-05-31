@@ -6,10 +6,10 @@ const MCP_ENDPOINT_PATH = '/api/mcp'
 function looksLikeMcpClient(request: NextRequest): boolean {
   const accept = request.headers.get('accept') ?? ''
   const contentType = request.headers.get('content-type') ?? ''
-  return (
-    accept.includes('text/event-stream') ||
-    contentType.includes('application/json')
-  )
+  // MCP streamable-HTTP clients send Content-Type: application/json AND
+  // Accept: ..., text/event-stream (for SSE responses). Requiring both
+  // avoids rewriting unrelated JSON POSTs (webhooks, REST calls) to /api/mcp.
+  return contentType.includes('application/json') && accept.includes('text/event-stream')
 }
 
 export function middleware(request: NextRequest) {

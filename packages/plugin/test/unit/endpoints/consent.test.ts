@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeConsentHandler } from '../../../src/endpoints/consent.js'
+import { makeCsrfToken } from '../../../src/lib/csrf.js'
 
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
 
 const REGISTERED_URI = 'https://example.com/cb'
+const CODE_CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
+
 const VALID_CLIENT = {
   id: 'client-doc-1',
   clientId: 'client-1',
@@ -15,11 +18,12 @@ const VALID_BODY = {
   decision: 'approve',
   client_id: 'client-1',
   redirect_uri: REGISTERED_URI,
-  code_challenge: 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+  code_challenge: CODE_CHALLENGE,
   code_challenge_method: 'S256',
   state: 'csrf-state',
   user_id: 'user-1',
   scope: 'posts:read',
+  csrf_token: makeCsrfToken('user-1', 'client-1', REGISTERED_URI, CODE_CHALLENGE),
 }
 
 function makeReq(body: unknown, method = 'POST') {
@@ -90,5 +94,22 @@ describe('makeConsentHandler', () => {
     const location = res.headers.get('Location') ?? ''
     expect(location).toContain('code=pmoauth_ac_')
     expect(location).not.toContain('state=')
+  })
+
+  it('rejects missing csrf_token with 400', async () => {
+    const { csrf_token: _omit, ...bodyWithoutCsrf } = VALID_BODY
+    const res = await makeConsentHandler()(makeReq(bodyWithoutCsrf) as never)
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects tampered csrf_token with 400', async () => {
+    const res = await makeConsentHandler()(makeReq({ ...VALID_BODY, csrf_token: 'deadbeef'.repeat(8) }) as never)
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects forged csrf_token computed for different parameters with 400', async () => {
+    const forgery = makeCsrfToken('attacker', 'client-1', REGISTERED_URI, CODE_CHALLENGE)
+    const res = await makeConsentHandler()(makeReq({ ...VALID_BODY, csrf_token: forgery }) as never)
+    expect(res.status).toBe(400)
   })
 })

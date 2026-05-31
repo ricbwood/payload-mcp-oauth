@@ -99,8 +99,8 @@ export function installOverrideAuth(mcpPluginOptions: MCPPluginConfig, userColle
       Object.keys(ctx.capabilities).length > 0 ? ctx.capabilities : buildCapabilities(mcpPluginOptions)
 
     return {
-      user: typedUser as TypedUser,
       ...capabilities,
+      user: typedUser as TypedUser,
     } as MCPAccessSettings
   }
 }

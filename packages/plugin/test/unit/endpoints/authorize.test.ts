@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeAuthorizeHandler } from '../../../src/endpoints/authorize.js'
+import { makeCsrfToken } from '../../../src/lib/csrf.js'
+
+process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
 
 const REGISTERED_URI = 'https://example.com/cb'
 const VALID_CLIENT = {
@@ -104,5 +107,21 @@ describe('makeAuthorizeHandler', () => {
     const res = await makeAuthorizeHandler()(makeReq(VALID_QUERY, { id: 'user-1' }) as never)
     expect(res.headers.get('Content-Security-Policy')).toBeTruthy()
     expect(res.headers.get('Referrer-Policy')).toBe('no-referrer')
+  })
+
+  it('embeds a server-signed CSRF token bound to user/client/redirect/challenge', async () => {
+    const res = await makeAuthorizeHandler()(makeReq(VALID_QUERY, { id: 'user-1' }) as never)
+    const html = await res.text()
+    const expected = makeCsrfToken('user-1', VALID_QUERY.client_id, REGISTERED_URI, VALID_QUERY.code_challenge)
+    expect(html).toContain(`name="csrf_token" value="${expected}"`)
+  })
+
+  it('uses the configured consentPath as the form action', async () => {
+    const res = await makeAuthorizeHandler('/admin', undefined, '/cms/oauth/consent')(
+      makeReq(VALID_QUERY, { id: 'user-1' }) as never,
+    )
+    const html = await res.text()
+    expect(html).toContain('action="/cms/oauth/consent"')
+    expect(html).not.toContain('action="/api/oauth/consent"')
   })
 })

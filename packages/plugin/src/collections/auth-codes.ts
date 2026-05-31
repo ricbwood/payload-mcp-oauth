@@ -9,6 +9,7 @@ const sweepExpiredCodes: CollectionAfterChangeHook = async ({ operation, req }) 
 
   const expired = await req.payload.find({
     collection: 'oauth-auth-codes',
+    overrideAccess: true,
     where: { expiresAt: { less_than: now } },
     limit: 200,
     pagination: false,
@@ -17,6 +18,7 @@ const sweepExpiredCodes: CollectionAfterChangeHook = async ({ operation, req }) 
 
   const consumed = await req.payload.find({
     collection: 'oauth-auth-codes',
+    overrideAccess: true,
     where: { consumedAt: { exists: true } },
     limit: 200,
     pagination: false,
@@ -24,13 +26,19 @@ const sweepExpiredCodes: CollectionAfterChangeHook = async ({ operation, req }) 
   })
 
   const toDelete = [
-    ...expired.docs.map((d) => d.id),
-    ...consumed.docs.map((d) => d.id),
+    ...new Set([
+      ...expired.docs.map((d) => d.id),
+      ...consumed.docs.map((d) => d.id),
+    ]),
   ]
 
   await Promise.all(
     toDelete.map((id) =>
-      req.payload.delete({ collection: 'oauth-auth-codes', id, req }).catch(() => undefined),
+      req.payload
+        .delete({ collection: 'oauth-auth-codes', overrideAccess: true, id, req })
+        .catch((err) => {
+          req.payload.logger?.warn(`[pmoauth] sweepExpiredCodes: failed to delete id=${id}: ${String(err)}`)
+        }),
     ),
   )
 }

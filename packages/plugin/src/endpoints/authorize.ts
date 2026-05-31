@@ -1,4 +1,5 @@
 import type { PayloadHandler } from 'payload'
+import { makeCsrfToken } from '../lib/csrf.js'
 import { oauthErrorResponse, redirectResponse } from './helpers.js'
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -27,6 +28,8 @@ function buildConsentHtml(p: {
   state: string | undefined
   userId: string
   resource: string
+  csrfToken: string
+  consentPath: string
 }): string {
   const labels = p.scope.trim()
     ? p.scope.split(/\s+/).filter(Boolean).map((s) => SCOPE_LABELS[s] ?? s)
@@ -49,7 +52,7 @@ h1{font-size:1.25rem;margin-bottom:0.5rem}
 <h1>Authorize <strong>${e(p.clientName)}</strong></h1>
 <p>This application is requesting the following permissions:</p>
 <ul class="scope-list">${items}</ul>
-<form method="POST" action="/api/oauth/consent">
+<form method="POST" action="${e(p.consentPath)}">
 <input type="hidden" name="client_id" value="${e(p.clientId)}">
 <input type="hidden" name="redirect_uri" value="${e(p.redirectUri)}">
 <input type="hidden" name="code_challenge" value="${e(p.codeChallenge)}">
@@ -58,6 +61,7 @@ h1{font-size:1.25rem;margin-bottom:0.5rem}
 <input type="hidden" name="user_id" value="${e(p.userId)}">
 <input type="hidden" name="scope" value="${e(p.scope)}">
 <input type="hidden" name="resource" value="${e(p.resource)}">
+<input type="hidden" name="csrf_token" value="${e(p.csrfToken)}">
 <div class="actions">
 <button type="submit" name="decision" value="approve" class="btn btn-approve">Approve</button>
 <button type="submit" name="decision" value="deny" class="btn btn-deny">Deny</button>
@@ -77,7 +81,11 @@ function errorRedirect(redirectUri: string | null, error: string, description: s
   return redirectResponse(url.toString())
 }
 
-export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): PayloadHandler {
+export function makeAuthorizeHandler(
+  adminPath = '/admin',
+  loginPath?: string,
+  consentPath = '/api/oauth/consent',
+): PayloadHandler {
   return async (req) => {
     const q = req.query as Record<string, string | undefined>
     const responseType = q['response_type']
@@ -140,8 +148,9 @@ export function makeAuthorizeHandler(adminPath = '/admin', loginPath?: string): 
 
     const clientName = String(client['clientName'] ?? clientId)
     const userId = String((user as Record<string, unknown>)['id'] ?? '')
+    const csrfToken = makeCsrfToken(userId, clientId, redirectUri, codeChallenge)
 
-    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId, resource }), {
+    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId, resource, csrfToken, consentPath }), {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',

@@ -1,4 +1,5 @@
 import type { PayloadHandler } from 'payload'
+import { verifyCsrfToken } from '../lib/csrf.js'
 import { issueAuthCode } from '../lib/auth-codes.js'
 import { oauthErrorResponse, redirectResponse, parseBody } from './helpers.js'
 
@@ -18,11 +19,16 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
       const codeChallengeMethod = body['code_challenge_method'] as string | undefined
       const state = body['state'] as string | undefined
       const userId = body['user_id'] as string | undefined
+      const csrfToken = body['csrf_token'] as string | undefined
       const scope = (body['scope'] as string | undefined) ?? ''
       const resource = (body['resource'] as string | undefined) ?? ''
 
-      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !userId) {
+      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !userId || !csrfToken) {
         return oauthErrorResponse(400, 'invalid_request', 'Missing required consent parameters')
+      }
+
+      if (!verifyCsrfToken(csrfToken, userId, clientId, redirectUri, codeChallenge)) {
+        return oauthErrorResponse(400, 'invalid_request', 'Invalid CSRF token')
       }
 
       if (decision === 'deny') {
