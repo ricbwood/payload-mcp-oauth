@@ -16,6 +16,11 @@
       "types": "./dist/admin/index.d.ts",
       "import": "./dist/admin/index.js",
       "require": "./dist/admin/index.cjs"
+    },
+    "./middleware": {
+      "types": "./dist/next-middleware.d.ts",
+      "import": "./dist/next-middleware.js",
+      "require": "./dist/next-middleware.cjs"
     }
   },
   "files": [
@@ -30,14 +35,21 @@
   "peerDependencies": {
     "payload": "^3.0.0",
     "@payloadcms/plugin-mcp": "^3.0.0",
+    "next": "^14.0.0 || ^15.0.0 || ^16.0.0",
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "payload": "3.85.0",
     "@payloadcms/plugin-mcp": "3.85.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "tsup": "8.3.5",

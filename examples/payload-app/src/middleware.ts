@@ -1,38 +1,7 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
-
-const MCP_ENDPOINT_PATH = '/api/mcp'
-
-function looksLikeMcpClient(request: NextRequest): boolean {
-  const accept = request.headers.get('accept') ?? ''
-  const contentType = request.headers.get('content-type') ?? ''
-  // MCP streamable-HTTP clients send Content-Type: application/json AND
-  // Accept: ..., text/event-stream (for SSE responses). Requiring both
-  // avoids rewriting unrelated JSON POSTs (webhooks, REST calls) to /api/mcp.
-  return contentType.includes('application/json') && accept.includes('text/event-stream')
-}
-
-export function middleware(request: NextRequest) {
-  const { method, nextUrl } = request
-
-  if (nextUrl.pathname.startsWith('/api/oauth') || nextUrl.pathname.startsWith('/.well-known')) {
-    console.log(`[oauth-middleware] ${method} ${nextUrl.pathname}${nextUrl.search}`)
-  }
-
-  // MCP clients registered with the bare host URL (no /api/mcp suffix) POST
-  // their JSON-RPC payloads to the root, which Next.js otherwise answers with
-  // the home page HTML (200). Internally rewrite to /api/mcp so the bare-host
-  // form Just Works while the request body, method, and headers are preserved.
-  if (nextUrl.pathname === '/' && method === 'POST' && looksLikeMcpClient(request)) {
-    console.log(`[mcp-rewrite] POST / → ${MCP_ENDPOINT_PATH}`)
-    const rewritten = nextUrl.clone()
-    rewritten.pathname = MCP_ENDPOINT_PATH
-    return NextResponse.rewrite(rewritten)
-  }
-
-  return NextResponse.next()
-}
-
-export const config = {
-  matcher: ['/', '/api/oauth/:path*', '/.well-known/:path*'],
-}
+// The OAuth plugin ships the host-level routing it needs (bare-host MCP rewrite
+// + .well-known discovery rewrites) as a ready-made Next.js middleware. For the
+// default Payload layout, re-exporting it is all that's required.
+//
+// If you need your own middleware logic too, import `createMcpOAuthMiddleware`
+// instead and call it from within your own handler.
+export { mcpOAuthMiddleware as middleware, config } from '@brainwebuk/payload-plugin-mcp-oauth/middleware'

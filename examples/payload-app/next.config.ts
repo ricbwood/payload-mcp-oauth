@@ -3,18 +3,9 @@ import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  async rewrites() {
-    return [
-      {
-        source: '/.well-known/oauth-authorization-server',
-        destination: '/api/.well-known/oauth-authorization-server',
-      },
-      {
-        source: '/.well-known/oauth-protected-resource',
-        destination: '/api/.well-known/oauth-protected-resource',
-      },
-    ]
-  },
+  // The .well-known OAuth discovery rewrites are handled by the plugin's
+  // exported middleware (see src/middleware.ts), so no rewrites() entry is
+  // needed here.
   images: {
     localPatterns: [
       {

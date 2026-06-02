@@ -12,6 +12,22 @@ export interface PayloadMcpOAuthConfig {
    * A reference to the SAME options object passed to `mcpPlugin()`.
    * The OAuth plugin sets `overrideAuth` on this reference so that the MCP
    * handler can validate OAuth tokens at request time.
+   *
+   * ⚠️ This must be the exact same object reference — not a copy, spread, or
+   * fresh literal. Assign it to a `const` and pass that same `const` to both
+   * `mcpPlugin()` and `payloadMcpOAuth()`:
+   *
+   * ```ts
+   * const mcpOptions: MCPPluginConfig = { collections: { ... } }
+   * plugins: [
+   *   mcpPlugin(mcpOptions),
+   *   payloadMcpOAuth({ issuer, mcpPluginOptions: mcpOptions }),
+   * ]
+   * ```
+   *
+   * If you pass a different object, `overrideAuth` is installed on an object the
+   * MCP handler never sees, and OAuth tokens silently fail to authenticate while
+   * the API-key path keeps working.
    */
   mcpPluginOptions: MCPPluginConfig
 
