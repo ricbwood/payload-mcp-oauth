@@ -15,6 +15,11 @@ keep working unchanged.
 - Tokens hashed at rest (HMAC-SHA-256); refresh + revocation supported
 - Admin views for issued tokens and registered clients
 
+> **Installing with an AI coding agent?** Point it at
+> [`INSTALL_FOR_AGENTS.md`](./packages/plugin/INSTALL_FOR_AGENTS.md) (shipped in the
+> npm package too) — a step-by-step playbook with per-step verification and the
+> failure modes to watch for. Or just follow the manual steps below.
+
 ---
 
 ## Requirements
