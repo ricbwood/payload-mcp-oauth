@@ -164,8 +164,17 @@ export async function provisionApp({ appDir, port, log = () => {} }) {
 
   writeEnv(appDir, appEnv)
 
+  // The monorepo runs with strict-peer-dependencies=true and silences the
+  // upstream `mcp-handler → @modelcontextprotocol/sdk` version mismatch via
+  // peerDependencyRules. The isolated temp app doesn't inherit those rules, so
+  // a strict global config (the repo's, or the user's ~/.npmrc) would hard-fail
+  // the install on that harmless mismatch. Force non-strict here — both via the
+  // project .npmrc (beats ~/.npmrc) and the CLI flag (beats everything) — so the
+  // install is deterministic regardless of the host's pnpm config.
+  writeFileSync(path.join(appDir, '.npmrc'), '\nstrict-peer-dependencies=false\n', { flag: 'a' })
+
   log('Installing (clean) from the packed tarball…')
-  await run('pnpm', ['install', '--ignore-workspace'], { cwd: appDir })
+  await run('pnpm', ['install', '--ignore-workspace', '--config.strict-peer-dependencies=false'], { cwd: appDir })
 
   log('Regenerating the admin import map…')
   const payloadBin = path.join(appDir, 'node_modules/.bin/payload')
