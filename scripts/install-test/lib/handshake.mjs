@@ -56,7 +56,7 @@ export async function runHandshake({ baseUrl, email, password, check }) {
   const asRes = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`)
   const asJson = await asRes.json().catch(() => null)
   check(
-    'discovery: /.well-known/oauth-authorization-server returns JSON (middleware wired)',
+    'discovery: /.well-known/oauth-authorization-server returns JSON (proxy/middleware wired)',
     asRes.status === 200 && !!asJson?.issuer && !!asJson?.registration_endpoint && !!asJson?.token_endpoint,
     `status=${asRes.status} issuer=${asJson?.issuer}`,
   )

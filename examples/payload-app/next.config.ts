@@ -4,8 +4,8 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   output: 'standalone',
   // The .well-known OAuth discovery rewrites are handled by the plugin's
-  // exported middleware (see src/middleware.ts), so no rewrites() entry is
-  // needed here.
+  // exported handler wired up as a proxy (see src/proxy.ts), so no rewrites()
+  // entry is needed here.
   images: {
     localPatterns: [
       {

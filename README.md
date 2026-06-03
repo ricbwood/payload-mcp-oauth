@@ -23,7 +23,7 @@ keep working unchanged.
 |---|---|
 | `payload` | `^3.0.0` |
 | `@payloadcms/plugin-mcp` | `^3.0.0` (tested 3.85.0) |
-| `next` | `^14 \|\| ^15 \|\| ^16` (only for the exported middleware) |
+| `next` | `^14 \|\| ^15 \|\| ^16` (only for the exported proxy/middleware) |
 | Node | `>= 20` |
 
 ---
@@ -74,13 +74,31 @@ export default buildConfig({
 > (the API-key path keeps working, which makes this easy to miss). The plugin
 > also throws on boot if it is registered *before* `mcpPlugin()`.
 
-### 3. Add the Next.js middleware
+### 3. Add the proxy (Next.js 16) / middleware (Next.js 14–15)
 
 OAuth discovery (`/.well-known/...`) and bare-host MCP connectors need two
 host-level URL rewrites that a Payload plugin cannot register on its own. The
-plugin ships them as a ready-made middleware — create `src/middleware.ts` (next
-to your `app/` directory). Re-export the handler, but declare `config` as a
-**local** literal:
+plugin ships them as a ready-made request handler — wire it up with the file
+convention your Next.js version uses (next to your `app/` directory). Re-export
+the handler, but declare `config` as a **local** literal.
+
+**Next.js 16+** — Next renamed the `middleware` convention to `proxy`. Create
+`src/proxy.ts`:
+
+```ts
+export { mcpOAuthMiddleware as proxy } from '@brainwebuk/payload-plugin-mcp-oauth/middleware'
+
+export const config = {
+  matcher: [
+    '/',
+    '/.well-known/oauth-authorization-server',
+    '/.well-known/oauth-protected-resource',
+  ],
+}
+```
+
+**Next.js 14–15** — the `proxy` convention doesn't exist yet; create
+`src/middleware.ts` with the same body, exported as `middleware`:
 
 ```ts
 export { mcpOAuthMiddleware as middleware } from '@brainwebuk/payload-plugin-mcp-oauth/middleware'
@@ -95,19 +113,23 @@ export const config = {
 ```
 
 > ⚠️ **Don't re-export `config`** (e.g. `export { ..., config } from '…/middleware'`).
-> Next.js parses the middleware `config.matcher` at compile time and, as of
-> **Next 16**, hard-errors with *"can't recognize the exported `config` field …
-> it mustn't be reexported"* — which 500s **every** route in your app. The
-> matcher must be a static literal in `middleware.ts` itself.
+> Next.js parses the matcher at compile time and, as of **Next 16**, hard-errors
+> with *"can't recognize the exported `config` field … it mustn't be reexported"*
+> — which 500s **every** route in your app. The matcher must be a static literal
+> in your `proxy.ts` / `middleware.ts` itself.
+>
+> On Next 16 a `middleware.ts` still works but logs a deprecation warning — prefer
+> `proxy.ts`. Migrate an existing file with `npx @next/codemod middleware-to-proxy .`.
 
-Already have a `middleware.ts`? Compose it instead:
+Already have a proxy/middleware? Compose it instead (shown for Next 16; on 14–15
+name the file `middleware.ts` and the function `middleware`):
 
 ```ts
 import { createMcpOAuthMiddleware } from '@brainwebuk/payload-plugin-mcp-oauth/middleware'
 
 const mcpOAuth = createMcpOAuthMiddleware() // accepts { apiRoute, mcpEndpointPath, ... }
 
-export function middleware(request) {
+export function proxy(request) {
   // ...your logic first...
   return mcpOAuth(request)
 }
@@ -117,7 +139,7 @@ export const config = {
 }
 ```
 
-> No `next.config.ts` rewrites are required — the middleware handles discovery.
+> No `next.config.ts` rewrites are required — the proxy/middleware handles discovery.
 
 ### 4. Set environment variables
 
@@ -208,8 +230,9 @@ handler unchanged.
 |---|---|
 | `Error: payloadMcpOAuth must be registered AFTER mcpPlugin()` | Plugin order — put `payloadMcpOAuth()` after `mcpPlugin()`. |
 | OAuth tokens 401 but API keys work | `mcpPluginOptions` wasn't the **same** object reference (step 2). |
-| `/.well-known/...` returns the app's HTML / 404 | `middleware.ts` missing or its `matcher` doesn't include the well-known paths (step 3). |
-| **Every** route 500s; log says *"can't recognize the exported `config` field … it mustn't be reexported"* | `config` was re-exported from `…/middleware` instead of declared as a local literal in `middleware.ts` (step 3). |
+| `/.well-known/...` returns the app's HTML / 404 | `proxy.ts` / `middleware.ts` missing or its `matcher` doesn't include the well-known paths (step 3). |
+| **Every** route 500s; log says *"can't recognize the exported `config` field … it mustn't be reexported"* | `config` was re-exported from `…/middleware` instead of declared as a local literal in your `proxy.ts` / `middleware.ts` (step 3). |
+| `The "middleware" file convention is deprecated` warning (Next 16) | Rename `src/middleware.ts` → `src/proxy.ts` and export the handler as `proxy` (step 3). |
 | Admin `/oauth/tokens` or `/oauth/clients` view fails to load | Import map not regenerated (step 5). |
 | Boots fine in dev, throws on deploy | `PMOAUTH_TOKEN_PEPPER` not set in production (step 4). |
 
