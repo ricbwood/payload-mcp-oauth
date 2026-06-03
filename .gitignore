@@ -7,3 +7,4 @@ coverage/
 !.env.example
 .DS_Store
 .firebase/
+.claude/scheduled_tasks.lock
