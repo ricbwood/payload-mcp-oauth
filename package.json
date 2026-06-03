@@ -13,6 +13,7 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "test:install": "node scripts/install-test/run.mjs",
+    "test:install:serve": "node scripts/install-test/serve.mjs",
     "dev:example": "pnpm --filter ./examples/payload-app dev",
     "prepare": "husky"
   },

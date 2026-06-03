@@ -11,6 +11,22 @@ pnpm test:install            # full run, temp dir cleaned up on success
 pnpm test:install -- --keep  # keep the temp app even on success, for debugging
 ```
 
+### See it running in a browser
+
+`serve` provisions the site the **same way** the test does (shared
+`lib/provision.mjs`), then leaves `next dev` running so you can click around —
+including the OAuth admin views — instead of running the handshake:
+
+```bash
+pnpm test:install:serve              # http://localhost:3000
+pnpm test:install:serve -- --port 4000
+pnpm test:install:serve -- --fresh   # rebuild from scratch (otherwise reuses the last install)
+```
+
+It prints the admin URL and a seeded login (`install-test@example.com` /
+`install-test-password-123`). The app lives at `<tmp>/pmoauth-serve/app` and is
+reused across launches for speed. Press Ctrl+C to stop.
+
 ## What it does
 
 1. **Build + `pnpm pack`** the plugin → a real `.tgz`, identical to `npm publish`.
@@ -32,7 +48,10 @@ pnpm test:install -- --keep  # keep the temp app even on success, for debugging
 
 ## Files
 
-- `run.mjs` — orchestrator (build → pack → install → assert → boot → handshake).
+- `run.mjs` — the test orchestrator (provision → assert → boot → handshake).
+- `serve.mjs` — provision and leave `next dev` running for manual inspection.
+- `lib/provision.mjs` — shared provisioning (build → pack → install → importmap →
+  migrate) used by both, so the served site matches the tested one.
 - `lib/handshake.mjs` — reusable HTTP OAuth + PKCE handshake and wrapper assertions.
 - `fixtures/install-seed.mjs` — runs inside the temp app (via `tsx`) to push the
   schema, assert the OAuth collections exist, and seed an admin user.
