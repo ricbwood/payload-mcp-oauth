@@ -79,11 +79,26 @@ export default buildConfig({
 OAuth discovery (`/.well-known/...`) and bare-host MCP connectors need two
 host-level URL rewrites that a Payload plugin cannot register on its own. The
 plugin ships them as a ready-made middleware — create `src/middleware.ts` (next
-to your `app/` directory) with a single re-export:
+to your `app/` directory). Re-export the handler, but declare `config` as a
+**local** literal:
 
 ```ts
-export { mcpOAuthMiddleware as middleware, config } from '@brainwebuk/payload-plugin-mcp-oauth/middleware'
+export { mcpOAuthMiddleware as middleware } from '@brainwebuk/payload-plugin-mcp-oauth/middleware'
+
+export const config = {
+  matcher: [
+    '/',
+    '/.well-known/oauth-authorization-server',
+    '/.well-known/oauth-protected-resource',
+  ],
+}
 ```
+
+> ⚠️ **Don't re-export `config`** (e.g. `export { ..., config } from '…/middleware'`).
+> Next.js parses the middleware `config.matcher` at compile time and, as of
+> **Next 16**, hard-errors with *"can't recognize the exported `config` field …
+> it mustn't be reexported"* — which 500s **every** route in your app. The
+> matcher must be a static literal in `middleware.ts` itself.
 
 Already have a `middleware.ts`? Compose it instead:
 
@@ -194,6 +209,7 @@ handler unchanged.
 | `Error: payloadMcpOAuth must be registered AFTER mcpPlugin()` | Plugin order — put `payloadMcpOAuth()` after `mcpPlugin()`. |
 | OAuth tokens 401 but API keys work | `mcpPluginOptions` wasn't the **same** object reference (step 2). |
 | `/.well-known/...` returns the app's HTML / 404 | `middleware.ts` missing or its `matcher` doesn't include the well-known paths (step 3). |
+| **Every** route 500s; log says *"can't recognize the exported `config` field … it mustn't be reexported"* | `config` was re-exported from `…/middleware` instead of declared as a local literal in `middleware.ts` (step 3). |
 | Admin `/oauth/tokens` or `/oauth/clients` view fails to load | Import map not regenerated (step 5). |
 | Boots fine in dev, throws on deploy | `PMOAUTH_TOKEN_PEPPER` not set in production (step 4). |
 

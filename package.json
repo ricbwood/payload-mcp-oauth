@@ -12,6 +12,7 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:install": "node scripts/install-test/run.mjs",
     "dev:example": "pnpm --filter ./examples/payload-app dev",
     "prepare": "husky"
   },
