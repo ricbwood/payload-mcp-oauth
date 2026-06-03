@@ -1,0 +1,49 @@
+name: Publish to npm
+
+# Publishes @brainwebuk/payload-plugin-mcp-oauth using npm OIDC "trusted
+# publishing" — no NPM_TOKEN secret and no 2FA OTP required. The trust is
+# configured on npmjs.com (Package → Settings → Trusted Publisher) pointing at
+# this repo + this workflow filename.
+#
+# Release flow: bump packages/plugin/package.json version, commit + push, then
+# either publish a GitHub Release (auto-triggers this) or run it manually from
+# the Actions tab. Publishing a version that already exists on npm will fail.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # If you set an Environment name in the npm trusted-publisher form, also
+    # create it under repo Settings → Environments and uncomment the next line:
+    # environment: release
+    permissions:
+      contents: read
+      id-token: write # REQUIRED: lets npm mint an OIDC token for trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from the root package.json "packageManager" field.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      # npm OIDC trusted publishing needs npm >= 11.5.1; the bundled npm is older.
+      - name: Use an OIDC-capable npm
+        run: npm install -g npm@latest
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build the plugin
+        run: pnpm --filter @brainwebuk/payload-plugin-mcp-oauth build
+
+      - name: Publish
+        working-directory: packages/plugin
+        run: npm publish --provenance --access public
