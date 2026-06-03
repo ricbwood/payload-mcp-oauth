@@ -2,6 +2,13 @@
   "name": "@brainwebuk/payload-plugin-mcp-oauth",
   "version": "0.1.4",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ricbwood/payload-mcp-oauth.git",
+    "directory": "packages/plugin"
+  },
+  "homepage": "https://github.com/ricbwood/payload-mcp-oauth/tree/main/packages/plugin#readme",
+  "bugs": "https://github.com/ricbwood/payload-mcp-oauth/issues",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
