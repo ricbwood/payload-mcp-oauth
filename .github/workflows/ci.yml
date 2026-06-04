@@ -41,13 +41,18 @@ jobs:
         run: pnpm --filter './packages/plugin' lint
 
       - name: Test
-        # Run the published package's unit suite. The example app's integration
-        # test needs a full runtime env (PAYLOAD_SECRET, a DB, etc.) and is a test
-        # fixture, not shipped — it's exercised end-to-end by `pnpm test:install`
-        # instead of in this lean matrix.
+        # The published package's unit suite.
         run: pnpm --filter './packages/plugin' test
 
       - name: Install-test helper unit tests
         # Fast, dependency-free node:test coverage for the install-test tooling
         # helpers (parsing, env I/O, source refresh).
         run: pnpm test:install-unit
+
+      - name: Example app integration test
+        # Boots Payload with the plugin (workspace source) and asserts the OAuth
+        # collections + endpoints are wired and the schema pushes. Self-provides
+        # its test env (see examples/payload-app/vitest.setup.ts). The full HTTP
+        # OAuth handshake against the PUBLISHED package is covered by the install
+        # test (`pnpm test:install`).
+        run: pnpm --filter ./examples/payload-app test:int
