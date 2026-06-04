@@ -85,9 +85,17 @@ try {
 
   console.log('\nStarting next dev…\n')
   server = startDevServer({ appDir, port, appEnv, inheritStdio: false })
+  // Stream next dev's output live (so the slow first compile isn't a silent
+  // wait) while still buffering the tail for the crash dump below.
   let log = ''
-  server.stdout.on('data', (d) => (log += d))
-  server.stderr.on('data', (d) => (log += d))
+  server.stdout.on('data', (d) => {
+    log += d
+    process.stdout.write(d)
+  })
+  server.stderr.on('data', (d) => {
+    log += d
+    process.stderr.write(d)
+  })
   server.on('close', () => {
     if (!shuttingDown) {
       console.error(`\nnext dev exited unexpectedly:\n${log.slice(-2000)}`)

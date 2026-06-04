@@ -130,11 +130,12 @@ Already have a proxy/middleware? Compose it instead (shown for Next 16; on 14–
 name the file `middleware.ts` and the function `middleware`):
 
 ```ts
+import type { NextRequest } from 'next/server'
 import { createMcpOAuthMiddleware } from '@brainwebuk/payload-plugin-mcp-oauth/middleware'
 
 const mcpOAuth = createMcpOAuthMiddleware() // accepts { apiRoute, mcpEndpointPath, ... }
 
-export function proxy(request) {
+export function proxy(request: NextRequest) {
   // ...your logic first...
   return mcpOAuth(request)
 }
@@ -171,7 +172,8 @@ installing:
 pnpm payload generate:importmap
 ```
 
-Commit the updated `app/(payload)/admin/importMap.js`.
+Commit the updated `src/app/(payload)/admin/importMap.js` (drop the `src/` prefix
+if your app doesn't use a `src` directory).
 
 ### 6. Run database migrations
 
