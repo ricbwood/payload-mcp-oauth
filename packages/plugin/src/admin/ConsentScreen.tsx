@@ -59,6 +59,7 @@ export function ConsentScreen({
           body { font-family: system-ui, sans-serif; max-width: 480px; margin: 80px auto; padding: 0 1rem; }
           h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
           .scope-list { list-style: disc; padding-left: 1.5rem; margin: 1rem 0; }
+          .note { font-size: 0.85rem; color: #555; background: #f7f7f7; border-left: 3px solid #d0d0d0; padding: 0.6rem 0.8rem; margin: 1rem 0; }
           .actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
           .btn { padding: 0.5rem 1.25rem; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
           .btn-approve { background: #0070f3; color: #fff; }
@@ -67,12 +68,21 @@ export function ConsentScreen({
       </head>
       <body>
         <h1>Authorize <strong>{clientName}</strong></h1>
-        <p>This application is requesting the following permissions:</p>
+        <p>
+          Approving will let <strong>{clientName}</strong> access your Payload CMS instance{' '}
+          <strong>acting as you</strong>. It requested:
+        </p>
         <ul className="scope-list">
           {labels.map((label) => (
             <li key={label}>{label}</li>
           ))}
         </ul>
+        <p className="note">
+          The items above are what the application asked for. This MCP server does not yet restrict
+          access per-permission &mdash; approving grants the application{' '}
+          <strong>all tools enabled on this server</strong>, on your behalf. Only approve
+          applications you trust.
+        </p>
         <form method="POST" action="/api/oauth/consent">
           <input type="hidden" name="client_id" value={clientId} />
           <input type="hidden" name="redirect_uri" value={redirectUri} />
