@@ -12,6 +12,7 @@ import { makeRevokeHandler } from './endpoints/revoke.js'
 import { makeTokenHandler } from './endpoints/token.js'
 import { createRateLimitStore, rateLimitKey } from './middleware/rate-limit.js'
 import { wrapMcpEndpointHandler } from './middleware/wrap-mcp.js'
+import { OAUTH_AS_METADATA_PATH, OAUTH_PRM_METADATA_PATH } from './lib/paths.js'
 import { PayloadMcpOAuthError } from './types.js'
 
 const SUPPORTED_MCP_RANGE = { min: [3, 0, 0], max: [3, 999, 999] } as const
@@ -167,12 +168,12 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
   // T5.5: build OAuth endpoints
   const oauthEndpoints: Endpoint[] = [
     {
-      path: '/.well-known/oauth-authorization-server',
+      path: OAUTH_AS_METADATA_PATH,
       method: 'get',
       handler: makeAsMetadataHandler(resolved.issuer),
     },
     {
-      path: '/.well-known/oauth-protected-resource',
+      path: OAUTH_PRM_METADATA_PATH,
       method: 'get',
       handler: makePrmMetadataHandler(resolved.issuer),
     },

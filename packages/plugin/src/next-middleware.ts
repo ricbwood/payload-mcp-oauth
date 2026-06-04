@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { OAUTH_AS_METADATA_PATH, OAUTH_PRM_METADATA_PATH } from './lib/paths.js'
 
 /**
  * Options for {@link createMcpOAuthMiddleware}.
@@ -70,8 +71,7 @@ export function createMcpOAuthMiddleware(
 
     if (
       rewriteWellKnown &&
-      (pathname === '/.well-known/oauth-authorization-server' ||
-        pathname === '/.well-known/oauth-protected-resource')
+      (pathname === OAUTH_AS_METADATA_PATH || pathname === OAUTH_PRM_METADATA_PATH)
     ) {
       const rewritten = nextUrl.clone()
       rewritten.pathname = `${apiRoute}${pathname}`
@@ -103,7 +103,9 @@ export const mcpOAuthMiddleware = createMcpOAuthMiddleware()
 
 /**
  * Static matcher for the paths the middleware acts on. Next.js requires
- * `config.matcher` to be statically analysable, so this is a literal.
+ * `config.matcher` to be statically analysable, so this MUST stay a string
+ * literal (it can't reference OAUTH_DISCOVERY_PATHS). A unit test asserts it
+ * stays in sync with those constants.
  */
 export const config = {
   matcher: [
