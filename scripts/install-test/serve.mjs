@@ -54,6 +54,9 @@ function shutdown() {
       /* already gone */
     }
   }
+  // Safety net for the provisioning-failure path (provisionApp threw before the
+  // eager restore below ran). A no-op once the eager restore has already cleaned
+  // the lockfile — restoreLockfile only writes when it actually differs.
   if (restoreLockfile(lockfileSnapshot)) {
     console.log('\nRestored repo pnpm-lock.yaml.')
   }

@@ -36,26 +36,40 @@ export function run(cmd, args, opts = {}) {
   })
 }
 
-export function freePort() {
-  return new Promise((resolve, reject) => {
+/**
+ * Try to bind `port` (0 = let the OS pick a free one). Resolves the bound port
+ * number on success, or null if the port is already in use.
+ */
+function probePort(port) {
+  return new Promise((resolve) => {
     const srv = createServer()
     srv.unref()
-    srv.on('error', reject)
-    srv.listen(0, () => {
-      const { port } = srv.address()
-      srv.close(() => resolve(port))
+    // listen failed (e.g. EADDRINUSE) → port not free. The server never opened,
+    // so there's nothing to close.
+    const onListenError = () => resolve(null)
+    srv.once('error', onListenError)
+    srv.once('listening', () => {
+      const { port: bound } = srv.address()
+      // Listen succeeded: stop treating errors as "busy", and swallow any error
+      // emitted during the async close so it can't resolve(null) or throw.
+      srv.removeListener('error', onListenError)
+      srv.on('error', () => {})
+      srv.close(() => resolve(bound))
     })
+    srv.listen(port)
   })
 }
 
+/** An OS-assigned free port. */
+export async function freePort() {
+  const port = await probePort(0)
+  if (port == null) throw new Error('could not acquire a free port')
+  return port
+}
+
 /** Resolve to true if nothing is already listening on `port`. */
-export function portFree(port) {
-  return new Promise((resolve) => {
-    const srv = createServer()
-    srv.once('error', () => resolve(false))
-    srv.once('listening', () => srv.close(() => resolve(true)))
-    srv.listen(port)
-  })
+export async function portFree(port) {
+  return (await probePort(port)) !== null
 }
 
 export async function waitForServer(url, timeoutMs, child) {
