@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { makeAuthorizeHandler } from '../../../src/endpoints/authorize.js'
-import { makeCsrfToken } from '../../../src/lib/csrf.js'
+import { verifyCsrfToken } from '../../../src/lib/csrf.js'
 
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
 
@@ -122,8 +122,13 @@ describe('makeAuthorizeHandler', () => {
   it('embeds a server-signed CSRF token bound to user/client/redirect/challenge', async () => {
     const res = await makeAuthorizeHandler()(makeReq(VALID_QUERY, { id: 'user-1' }) as never)
     const html = await res.text()
-    const expected = makeCsrfToken('user-1', VALID_QUERY.client_id, REGISTERED_URI, VALID_QUERY.code_challenge)
-    expect(html).toContain(`name="csrf_token" value="${expected}"`)
+    const m = html.match(/name="csrf_token" value="([^"]+)"/)
+    expect(m).not.toBeNull()
+    const token = m![1] as string
+    // The embedded token is time-bound and must validate for the bound params...
+    expect(verifyCsrfToken(token, 'user-1', VALID_QUERY.client_id, REGISTERED_URI, VALID_QUERY.code_challenge)).toBe(true)
+    // ...but not for a different user (no cross-user consent).
+    expect(verifyCsrfToken(token, 'other-user', VALID_QUERY.client_id, REGISTERED_URI, VALID_QUERY.code_challenge)).toBe(false)
   })
 
   it('uses the configured consentPath as the form action', async () => {
