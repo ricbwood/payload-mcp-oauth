@@ -50,6 +50,16 @@ describe('makeAuthorizeHandler', () => {
     expect(res.headers.get('X-Frame-Options')).toBe('DENY')
   })
 
+  it('discloses that approval grants all enabled tools (consent integrity, no per-scope narrowing yet)', async () => {
+    // The token is granted the operator-configured capability set regardless of the
+    // requested scope (see issue #35). The consent screen must say so plainly rather
+    // than implying the listed scopes bound the grant.
+    const res = await makeAuthorizeHandler()(makeReq(VALID_QUERY, { id: 'user-1' }) as never)
+    const html = await res.text()
+    expect(html).toMatch(/acting as you/i)
+    expect(html).toMatch(/all tools enabled on this server/i)
+  })
+
   it('rejects unsupported response_type with JSON error', async () => {
     const res = await makeAuthorizeHandler()(makeReq({ ...VALID_QUERY, response_type: 'token' }) as never)
     const body = await res.json() as Record<string, unknown>
