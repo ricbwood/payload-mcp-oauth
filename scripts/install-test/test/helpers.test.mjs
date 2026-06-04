@@ -1,6 +1,8 @@
 // Unit tests for the install-test tooling helpers, using Node's built-in test
 // runner (no extra deps — scripts/install-test isn't a package). Run with:
-//   node --test scripts/install-test/test/
+//   pnpm test:install-unit
+// Keep install-test helper tests in this single file (the npm script passes an
+// explicit file path — no glob — so it works on Node 20+ and on Windows cmd).
 // These guard the pure helpers behind the install harness (parsing, env I/O,
 // source refresh) — the spots where regressions previously slipped in.
 
