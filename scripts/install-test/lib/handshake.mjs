@@ -20,12 +20,14 @@ function makePkce() {
 }
 
 function decodeEntities(s) {
+  // Decode `&amp;` LAST so an already-escaped sequence like `&amp;lt;` decodes to
+  // the literal `&lt;` rather than being double-unescaped into `<`.
   return s
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, '&')
 }
 
 /** Pull the hidden form fields out of the server-rendered consent page. */
