@@ -30,13 +30,28 @@ export function decodeEntities(s) {
     .replace(/&amp;/g, '&')
 }
 
-/** Pull the hidden form fields out of the server-rendered consent page. */
+/**
+ * Pull the hidden form fields out of the server-rendered consent page.
+ * Parses each <input> tag's attributes independently, so it's robust to
+ * attribute order (type/name/value in any order) and to single OR double quotes
+ * — the consent markup changing (React/Next/Payload updates) won't silently
+ * break the handshake.
+ */
 export function parseConsentFields(html) {
   const fields = {}
-  const re = /<input[^>]*type="hidden"[^>]*name="([^"]+)"[^>]*value="([^"]*)"[^>]*>/g
-  let m
-  while ((m = re.exec(html)) !== null) {
-    fields[m[1]] = decodeEntities(m[2])
+  const tagRe = /<input\b[^>]*>/gi
+  // attr: name = "double" | 'single'  (group 2 = dq value, group 3 = sq value)
+  const attrRe = /([a-zA-Z_:][-\w:.]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/g
+  let tag
+  while ((tag = tagRe.exec(html)) !== null) {
+    const attrs = {}
+    let a
+    while ((a = attrRe.exec(tag[0])) !== null) {
+      attrs[a[1].toLowerCase()] = decodeEntities(a[2] !== undefined ? a[2] : (a[3] ?? ''))
+    }
+    if (attrs.type === 'hidden' && attrs.name) {
+      fields[attrs.name] = attrs.value ?? ''
+    }
   }
   return fields
 }

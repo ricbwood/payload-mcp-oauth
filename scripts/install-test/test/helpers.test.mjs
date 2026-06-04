@@ -40,6 +40,22 @@ test('parseConsentFields extracts hidden inputs and decodes their values', () =>
   assert.equal(f.decision, undefined) // non-hidden inputs ignored
 })
 
+test('parseConsentFields is robust to attribute order and quote style', () => {
+  // Single quotes, reordered attributes (name/value before type), extra
+  // attributes, and a self-closing slash — all should still parse.
+  const html = `
+    <input name='client_id' type='hidden' value='abc-123'>
+    <input value="deadbeef" type="hidden" name="csrf_token" data-x="y">
+    <input class="c" type='hidden' name='scope' value='a &amp; b' />
+    <input type="text" name="visible" value="ignore-me">
+  `
+  const f = parseConsentFields(html)
+  assert.equal(f.client_id, 'abc-123') // single-quoted, type in the middle
+  assert.equal(f.csrf_token, 'deadbeef') // value before type before name
+  assert.equal(f.scope, 'a & b') // single-quoted + entity-decoded + self-closing
+  assert.equal(f.visible, undefined) // type=text ignored
+})
+
 test('readEnv round-trips writeEnv, ignores comments/blanks, preserves "=" in values', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'pmoauth-readenv-'))
   try {
