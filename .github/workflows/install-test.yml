@@ -1,0 +1,47 @@
+name: Install test
+
+# Runs the from-scratch packaged install test (scripts/install-test/run.mjs):
+# builds + packs the plugin, installs the tarball into an isolated app, and
+# drives the full OAuth + PKCE handshake against it. It's slow (~3-5 min), so it
+# runs only when code that could affect packaging/install changes — on push to
+# main, on matching PRs, and on demand — not on every PR.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/plugin/**'
+      - 'scripts/install-test/**'
+      - 'examples/payload-app/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/install-test.yml'
+  pull_request:
+    paths:
+      - 'packages/plugin/**'
+      - 'scripts/install-test/**'
+      - 'examples/payload-app/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/install-test.yml'
+  workflow_dispatch:
+
+jobs:
+  install-test:
+    name: From-scratch packaged install
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the pnpm version from the root package.json "packageManager" field.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # Needed so `pnpm test:install` can build + pack the plugin.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Run from-scratch packaged install test
+        run: pnpm test:install
