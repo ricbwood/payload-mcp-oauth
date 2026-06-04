@@ -3,7 +3,8 @@
 import 'dotenv/config'
 
 process.env.PAYLOAD_SECRET ||= 'integration-test-secret-32-chars-minimum'
-// In-memory SQLite: fast, isolated per run, and leaves no .db file behind. The
-// shared-cache form keeps a single in-memory DB across any connections Payload
-// opens within the process.
-process.env.DATABASE_URL ||= 'file::memory:?cache=shared'
+// In-memory SQLite: fast, isolated per run, leaves no file. ':memory:' is the
+// canonical identifier — it works with both the libSQL client (used here) and
+// better-sqlite3 without needing URI parsing, and avoids ':'/'?' which are
+// invalid in Windows paths. Payload uses one connection, so no shared cache.
+process.env.DATABASE_URL ||= ':memory:'

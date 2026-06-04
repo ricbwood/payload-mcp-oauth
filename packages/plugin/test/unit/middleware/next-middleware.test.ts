@@ -86,10 +86,10 @@ describe('exported config matcher', () => {
   })
 
   // config.matcher must be a static literal (Next can't resolve imported
-  // constants), so this guards against it drifting from OAUTH_DISCOVERY_PATHS.
+  // constants), so this guards against it drifting from OAUTH_DISCOVERY_PATHS in
+  // either direction — a missing discovery path OR an obsolete one left behind.
   it('stays in sync with OAUTH_DISCOVERY_PATHS', () => {
-    for (const p of OAUTH_DISCOVERY_PATHS) {
-      expect(config.matcher).toContain(p)
-    }
+    const discoveryMatchers = config.matcher.filter((p) => p !== '/')
+    expect(discoveryMatchers).toEqual([...OAUTH_DISCOVERY_PATHS])
   })
 })
