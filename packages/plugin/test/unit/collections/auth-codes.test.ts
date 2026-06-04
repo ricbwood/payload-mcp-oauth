@@ -54,6 +54,16 @@ describe('oauthAuthCodesCollection', () => {
     expect(typeof oauthAuthCodesCollection.access?.read).toBe('function')
   })
 
+  it('denies ALL public REST/GraphQL access, even to authenticated users (server-managed only)', () => {
+    const access = oauthAuthCodesCollection.access
+    const ctx = { req: { user: { id: '1', collection: 'users' } } } as never
+    for (const op of ['create', 'read', 'update', 'delete'] as const) {
+      const fn = access?.[op]
+      if (typeof fn !== 'function') throw new Error(`${op} is not a function`)
+      expect(fn(ctx), `${op} must be denied`).toBe(false)
+    }
+  })
+
   it('has timestamps disabled', () => {
     expect(oauthAuthCodesCollection.timestamps).toBe(false)
   })

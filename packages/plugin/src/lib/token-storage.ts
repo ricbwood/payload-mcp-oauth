@@ -5,10 +5,15 @@ const DEV_PEPPER = 'dev-insecure-pepper-do-not-use-in-production-0000000'
 function getPepper(): string {
   const pepper = process.env['PMOAUTH_TOKEN_PEPPER']
   if (pepper && pepper.length >= 32) return pepper
-  if (process.env['NODE_ENV'] !== 'production') return DEV_PEPPER
+  // The insecure built-in fallback is ONLY for explicit development/test. Any
+  // other environment (production, staging, or NODE_ENV unset) MUST provide a
+  // real pepper — otherwise token hashes would be forgeable with the public
+  // DEV_PEPPER baked into the published package.
+  const nodeEnv = process.env['NODE_ENV']
+  if (nodeEnv === 'development' || nodeEnv === 'test') return DEV_PEPPER
   throw new Error(
     '[payload-plugin-mcp-oauth] PMOAUTH_TOKEN_PEPPER is missing or too short. ' +
-      'In production this env var must be at least 32 characters. ' +
+      'It must be at least 32 characters outside of NODE_ENV=development|test. ' +
       'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"',
   )
 }

@@ -1,6 +1,13 @@
 import type { Access, CollectionConfig } from 'payload'
 
-const isAuthenticated: Access = ({ req }) => Boolean(req.user)
+// These OAuth collections are managed entirely server-side: the plugin's
+// endpoints operate with `overrideAccess: true` and the admin views read via the
+// Local API (which also bypasses access control). There is NO legitimate
+// external REST/GraphQL consumer, so deny all public access. This is a security
+// boundary: a previous `Boolean(req.user)` rule let ANY authenticated user
+// read/modify these rows — including rewriting a client's redirectUris (→ auth
+// code theft) or reading/deleting other users' tokens.
+const denyPublicAccess: Access = () => false
 
 export const oauthClientsCollection: CollectionConfig = {
   slug: 'oauth-clients',
@@ -12,10 +19,10 @@ export const oauthClientsCollection: CollectionConfig = {
       'Apps connected via OAuth. Claude Desktop registers itself automatically — you only need this screen to review or deactivate connections.',
   },
   access: {
-    create: isAuthenticated,
-    read: isAuthenticated,
-    update: isAuthenticated,
-    delete: isAuthenticated,
+    create: denyPublicAccess,
+    read: denyPublicAccess,
+    update: denyPublicAccess,
+    delete: denyPublicAccess,
   },
   timestamps: true,
   fields: [
