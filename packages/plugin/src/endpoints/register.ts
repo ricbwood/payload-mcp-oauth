@@ -14,17 +14,26 @@ export function makeRegisterHandler(): PayloadHandler {
     if (typeof clientName !== 'string' || clientName.trim() === '') {
       return oauthErrorResponse(400, 'invalid_client_metadata', 'client_name is required')
     }
+    if (clientName.length > 100) {
+      return oauthErrorResponse(400, 'invalid_client_metadata', 'client_name must not exceed 100 characters')
+    }
 
     // redirect_uris: must be a non-empty array of strings (RFC 7591 requires JSON body)
     const rawRedirectUris = body['redirect_uris']
     if (!Array.isArray(rawRedirectUris) || rawRedirectUris.length === 0) {
       return oauthErrorResponse(400, 'invalid_client_metadata', 'redirect_uris must be a non-empty array')
     }
+    if (rawRedirectUris.length > 10) {
+      return oauthErrorResponse(400, 'invalid_client_metadata', 'redirect_uris must not contain more than 10 URIs')
+    }
 
     const redirectUris: string[] = []
     for (const uri of rawRedirectUris) {
       if (typeof uri !== 'string') {
         return oauthErrorResponse(400, 'invalid_client_metadata', 'redirect_uris must contain strings')
+      }
+      if (uri.length > 2048) {
+        return oauthErrorResponse(400, 'invalid_redirect_uri', 'redirect_uri exceeds maximum length of 2048 characters')
       }
       let parsed: URL
       try {

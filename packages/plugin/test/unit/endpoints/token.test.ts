@@ -5,7 +5,8 @@ import { hashToken } from '../../../src/lib/token-storage.js'
 
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
 
-const VERIFIER = 'my-secure-pkce-verifier-string-length-ok'
+// RFC 7636 §Appendix B test vector (43 chars of the unreserved set)
+const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
 const CHALLENGE = crypto.createHash('sha256').update(VERIFIER).digest('base64url')
 const VALID_REFRESH = 'pmoauth_rt_Rv8xKq3mN2pLs9nW4tF2qMr6kB1uJ7pabc'
 
@@ -48,7 +49,8 @@ function makeReq(body: unknown, findDocs: unknown[] = [], method = 'POST') {
     payload: {
       find: vi.fn().mockResolvedValue({ docs: findDocs }),
       create: vi.fn().mockResolvedValue({ id: 'new-doc' }),
-      update: vi.fn().mockResolvedValue({}),
+      // Bulk update (where) returns BulkOperationResult { docs, errors }
+      update: vi.fn().mockResolvedValue({ docs: [{ id: 'consumed-doc' }] }),
     },
   }
 }
@@ -69,7 +71,7 @@ describe('makeTokenHandler — authorization_code grant', () => {
 
   it('returns invalid_grant for bad code', async () => {
     const req = makeReq(
-      { grant_type: 'authorization_code', code: 'pmoauth_ac_bad', client_id: 'c1', redirect_uri: 'https://a.com', code_verifier: 'v' },
+      { grant_type: 'authorization_code', code: 'pmoauth_ac_bad', client_id: 'c1', redirect_uri: 'https://a.com', code_verifier: VERIFIER },
       [],
     )
     const res = await makeTokenHandler()(req as never)
@@ -79,6 +81,16 @@ describe('makeTokenHandler — authorization_code grant', () => {
 
   it('returns invalid_request when required fields missing', async () => {
     const req = makeReq({ grant_type: 'authorization_code', code: 'pmoauth_ac_x' }, [])
+    const res = await makeTokenHandler()(req as never)
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_request')
+  })
+
+  it('returns invalid_request for code_verifier that violates RFC 7636 (too short)', async () => {
+    const req = makeReq(
+      { grant_type: 'authorization_code', code: 'pmoauth_ac_x', client_id: 'c1', redirect_uri: 'https://a.com', code_verifier: 'short' },
+      [],
+    )
     const res = await makeTokenHandler()(req as never)
     expect(res.status).toBe(400)
     expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_request')

@@ -114,13 +114,25 @@ export async function rotateRefreshToken(
     return null
   }
 
-  // Revoke the consumed refresh token
-  await payload.update({
+  // Atomic conditional revocation — only one concurrent request can win.
+  // Two simultaneous requests with the same refresh token will both find the
+  // token above (not yet revoked), but only one can satisfy the
+  // UPDATE WHERE revokedAt IS NULL constraint. The loser gets back an empty
+  // docs array and returns null without issuing a second token family.
+  const result = await payload.update({
     collection: 'oauth-tokens',
     overrideAccess: true,
-    id: token.id,
+    where: {
+      and: [
+        { tokenHash: { equals: tokenHash } },
+        { revokedAt: { equals: null } },
+      ],
+    },
     data: { revokedAt: new Date().toISOString() },
   })
+
+  const revoked = (result as unknown as { docs: unknown[] }).docs
+  if (!revoked?.length) return null
 
   // Issue fresh pair, linking parentTokenId for chain traceability
   return issueTokenPair(payload, {

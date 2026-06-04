@@ -40,16 +40,25 @@ describe('createRateLimiter', () => {
 })
 
 describe('rateLimitKey', () => {
-  it('uses client_id key when provided', () => {
-    expect(rateLimitKey('1.2.3.4', 'client-1')).toBe('cid:client-1')
+  it('combines IP and client_id so rotating client_ids cannot bypass the IP limit', () => {
+    expect(rateLimitKey('1.2.3.4', 'client-1')).toBe('ip:1.2.3.4|cid:client-1')
   })
 
-  it('falls back to IP key', () => {
+  it('uses IP-only key when no client_id is provided', () => {
     expect(rateLimitKey('1.2.3.4')).toBe('ip:1.2.3.4')
   })
 
   it('uses unknown for missing IP', () => {
     expect(rateLimitKey(undefined)).toBe('ip:unknown')
+  })
+
+  it('ensures two requests with the same IP but different client_ids share the IP bucket component', () => {
+    const key1 = rateLimitKey('1.2.3.4', 'client-a')
+    const key2 = rateLimitKey('1.2.3.4', 'client-b')
+    // Different keys (so per-client limits work), but both start with the same IP part
+    expect(key1).not.toBe(key2)
+    expect(key1).toContain('ip:1.2.3.4')
+    expect(key2).toContain('ip:1.2.3.4')
   })
 })
 

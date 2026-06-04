@@ -84,4 +84,41 @@ describe('makeRegisterHandler', () => {
     const res = await makeRegisterHandler()(makeReq({}, 'GET') as never)
     expect(res.status).toBe(405)
   })
+
+  it('rejects client_name longer than 100 characters', async () => {
+    const res = await makeRegisterHandler()(
+      makeReq({ client_name: 'A'.repeat(101), redirect_uris: ['https://a.com/cb'] }) as never,
+    )
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_client_metadata')
+  })
+
+  it('accepts client_name of exactly 100 characters', async () => {
+    const req = makeReq({ client_name: 'A'.repeat(100), redirect_uris: ['https://a.com/cb'] })
+    expect((await makeRegisterHandler()(req as never)).status).toBe(201)
+  })
+
+  it('rejects more than 10 redirect_uris', async () => {
+    const uris = Array.from({ length: 11 }, (_, i) => `https://example${i}.com/cb`)
+    const res = await makeRegisterHandler()(
+      makeReq({ client_name: 'App', redirect_uris: uris }) as never,
+    )
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_client_metadata')
+  })
+
+  it('accepts exactly 10 redirect_uris', async () => {
+    const uris = Array.from({ length: 10 }, (_, i) => `https://example${i}.com/cb`)
+    const req = makeReq({ client_name: 'App', redirect_uris: uris })
+    expect((await makeRegisterHandler()(req as never)).status).toBe(201)
+  })
+
+  it('rejects a redirect_uri exceeding 2048 characters', async () => {
+    const longPath = 'https://example.com/' + 'a'.repeat(2048)
+    const res = await makeRegisterHandler()(
+      makeReq({ client_name: 'App', redirect_uris: [longPath] }) as never,
+    )
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_redirect_uri')
+  })
 })

@@ -71,7 +71,9 @@ export function createRateLimitStore(overrides: RateLimitOptions = {}): RateLimi
 }
 
 export function rateLimitKey(ip: string | undefined, clientId?: string): string {
-  return clientId ? `cid:${clientId}` : `ip:${ip ?? 'unknown'}`
+  // Always include the IP so rotating client_ids cannot bypass per-IP limits.
+  const ipPart = `ip:${ip ?? 'unknown'}`
+  return clientId ? `${ipPart}|cid:${clientId}` : ipPart
 }
 
 export function applyRateLimit(

@@ -3,7 +3,12 @@ import type { PayloadRequest } from 'payload'
 export function jsonResponse(data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return Response.json(data, {
     status,
-    headers: { 'Cache-Control': 'no-store', ...extraHeaders },
+    headers: {
+      'Cache-Control': 'no-store',
+      'Strict-Transport-Security': 'max-age=31536000',
+      'X-Content-Type-Options': 'nosniff',
+      ...extraHeaders,
+    },
   })
 }
 

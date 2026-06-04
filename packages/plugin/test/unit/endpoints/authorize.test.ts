@@ -104,6 +104,14 @@ describe('makeAuthorizeHandler', () => {
     expect(res.headers.get('Location')).toContain('error=invalid_request')
   })
 
+  it('rejects a code_challenge that does not conform to RFC 7636 (wrong length)', async () => {
+    const res = await makeAuthorizeHandler()(
+      makeReq({ ...VALID_QUERY, code_challenge: 'tooshort' }, { id: 'u1' }) as never,
+    )
+    expect(res.status).toBe(302)
+    expect(res.headers.get('Location')).toContain('error=invalid_request')
+  })
+
   it('renders consent HTML when state is absent (state is optional per OAuth 2.1)', async () => {
     const res = await makeAuthorizeHandler()(
       makeReq({ ...VALID_QUERY, state: undefined }, { id: 'u1' }) as never,
