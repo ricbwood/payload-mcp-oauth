@@ -41,4 +41,8 @@ jobs:
         run: pnpm --filter './packages/plugin' lint
 
       - name: Test
-        run: pnpm test
+        # Run the published package's unit suite. The example app's integration
+        # test needs a full runtime env (PAYLOAD_SECRET, a DB, etc.) and is a test
+        # fixture, not shipped — it's exercised end-to-end by `pnpm test:install`
+        # instead of in this lean matrix.
+        run: pnpm --filter './packages/plugin' test
