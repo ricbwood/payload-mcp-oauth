@@ -26,9 +26,10 @@ const VALID_BODY = {
   csrf_token: makeCsrfToken('user-1', 'client-1', REGISTERED_URI, CODE_CHALLENGE),
 }
 
-function makeReq(body: unknown, method = 'POST') {
+function makeReq(body: unknown, method = 'POST', user: unknown = { id: 'user-1' }) {
   return {
     method,
+    user,
     headers: new Headers({ 'content-type': 'application/json' }),
     json: vi.fn().mockResolvedValue(body),
     text: vi.fn(),
@@ -111,5 +112,56 @@ describe('makeConsentHandler', () => {
     const forgery = makeCsrfToken('attacker', 'client-1', REGISTERED_URI, CODE_CHALLENGE)
     const res = await makeConsentHandler()(makeReq({ ...VALID_BODY, csrf_token: forgery }) as never)
     expect(res.status).toBe(400)
+  })
+
+  it('rejects an unauthenticated consent POST with 401 (session binding)', async () => {
+    const req = makeReq(VALID_BODY, 'POST', null)
+    const res = await makeConsentHandler()(req as never)
+    expect(res.status).toBe(401)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('access_denied')
+    expect(req.payload.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects when the form user_id does not match the session user with 403', async () => {
+    // Token is minted for the *session* user, so an attacker who swaps in a
+    // victim user_id cannot make it validate; the explicit mismatch check fires
+    // first and returns 403.
+    const req = makeReq({ ...VALID_BODY, user_id: 'victim-99' }, 'POST', { id: 'user-1' })
+    const res = await makeConsentHandler()(req as never)
+    expect(res.status).toBe(403)
+    expect(req.payload.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects a csrf_token minted for a different user than the session with 400', async () => {
+    // A token bound to a victim under their own session, replayed by an
+    // attacker whose session is user-1, must not validate.
+    const victimToken = makeCsrfToken('victim-99', 'client-1', REGISTERED_URI, CODE_CHALLENGE)
+    const req = makeReq({ ...VALID_BODY, csrf_token: victimToken }, 'POST', { id: 'user-1' })
+    const res = await makeConsentHandler()(req as never)
+    expect(res.status).toBe(400)
+    expect(req.payload.create).not.toHaveBeenCalled()
+  })
+
+  it('mints the auth code for the SESSION user, ignoring the body user_id', async () => {
+    // No user_id in the body (so the mismatch guard is skipped); the code must
+    // still be minted for the authenticated session user.
+    const { user_id: _omit, ...bodyNoUser } = VALID_BODY
+    const req = makeReq(bodyNoUser, 'POST', { id: 'user-1' })
+    const res = await makeConsentHandler()(req as never)
+    expect(res.status).toBe(302)
+    expect(req.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'oauth-auth-codes',
+        data: expect.objectContaining({ userId: 'user-1' }),
+      }),
+    )
+  })
+
+  it('rejects an expired csrf_token with 400', async () => {
+    const stale = makeCsrfToken('user-1', 'client-1', REGISTERED_URI, CODE_CHALLENGE, Date.now() - 11 * 60 * 1000)
+    const req = makeReq({ ...VALID_BODY, csrf_token: stale }, 'POST', { id: 'user-1' })
+    const res = await makeConsentHandler()(req as never)
+    expect(res.status).toBe(400)
+    expect(req.payload.create).not.toHaveBeenCalled()
   })
 })

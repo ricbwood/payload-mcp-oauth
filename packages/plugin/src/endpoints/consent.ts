@@ -10,6 +10,15 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
         return oauthErrorResponse(405, 'invalid_request', 'Method not allowed')
       }
 
+      // Session binding: auth codes are minted here, so the logged-in session
+      // gate enforced at /authorize MUST be re-enforced. Never trust the user
+      // identity from the request body — derive it from the authenticated
+      // session and bind the code (and CSRF check) to that user.
+      const sessionUserId = String((req.user as Record<string, unknown> | null | undefined)?.['id'] ?? '')
+      if (!sessionUserId) {
+        return oauthErrorResponse(401, 'access_denied', 'Authentication required')
+      }
+
       const body = await parseBody(req)
 
       const decision = body['decision'] as string | undefined
@@ -18,17 +27,25 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
       const codeChallenge = body['code_challenge'] as string | undefined
       const codeChallengeMethod = body['code_challenge_method'] as string | undefined
       const state = body['state'] as string | undefined
-      const userId = body['user_id'] as string | undefined
+      const bodyUserId = body['user_id'] as string | undefined
       const csrfToken = body['csrf_token'] as string | undefined
       const scope = (body['scope'] as string | undefined) ?? ''
       const resource = (body['resource'] as string | undefined) ?? ''
 
-      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !userId || !csrfToken) {
+      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !csrfToken) {
         return oauthErrorResponse(400, 'invalid_request', 'Missing required consent parameters')
       }
 
-      if (!verifyCsrfToken(csrfToken, userId, clientId, redirectUri, codeChallenge)) {
-        return oauthErrorResponse(400, 'invalid_request', 'Invalid CSRF token')
+      // Defense in depth: if the form carried a user_id, it must match the
+      // session. The authoritative identity is always the session user.
+      if (bodyUserId && bodyUserId !== sessionUserId) {
+        return oauthErrorResponse(403, 'access_denied', 'Session does not match the authorization request')
+      }
+
+      // CSRF token is verified against the *session* user — a token minted for a
+      // different user (or a replay past its TTL) will not validate.
+      if (!verifyCsrfToken(csrfToken, sessionUserId, clientId, redirectUri, codeChallenge)) {
+        return oauthErrorResponse(400, 'invalid_request', 'Invalid or expired CSRF token')
       }
 
       if (decision === 'deny') {
@@ -64,7 +81,7 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
 
       const code = await issueAuthCode(req.payload, {
         clientId,
-        userId,
+        userId: sessionUserId,
         redirectUri,
         scope,
         codeChallenge,
