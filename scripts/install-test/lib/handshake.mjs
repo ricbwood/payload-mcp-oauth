@@ -19,7 +19,7 @@ function makePkce() {
   return { verifier, challenge }
 }
 
-function decodeEntities(s) {
+export function decodeEntities(s) {
   // Decode `&amp;` LAST so an already-escaped sequence like `&amp;lt;` decodes to
   // the literal `&lt;` rather than being double-unescaped into `<`.
   return s
@@ -31,7 +31,7 @@ function decodeEntities(s) {
 }
 
 /** Pull the hidden form fields out of the server-rendered consent page. */
-function parseConsentFields(html) {
+export function parseConsentFields(html) {
   const fields = {}
   const re = /<input[^>]*type="hidden"[^>]*name="([^"]+)"[^>]*value="([^"]*)"[^>]*>/g
   let m

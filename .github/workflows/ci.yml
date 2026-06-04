@@ -46,3 +46,8 @@ jobs:
         # fixture, not shipped — it's exercised end-to-end by `pnpm test:install`
         # instead of in this lean matrix.
         run: pnpm --filter './packages/plugin' test
+
+      - name: Install-test helper unit tests
+        # Fast, dependency-free node:test coverage for the install-test tooling
+        # helpers (parsing, env I/O, source refresh).
+        run: pnpm test:install-unit
