@@ -191,7 +191,8 @@ resolves admin components through a generated import map.
 pnpm payload generate:importmap     # then commit the updated importMap.js
 ```
 
-**Verify:** `app/(payload)/admin/importMap.js` now references
+**Verify:** `src/app/(payload)/admin/importMap.js` (or `app/(payload)/admin/importMap.js`
+if the app has no `src` directory) now references
 `@brainwebuk/payload-plugin-mcp-oauth/admin`.
 
 ---
@@ -209,13 +210,20 @@ The plugin adds collections **`oauth-clients`**, **`oauth-auth-codes`**, and
   pnpm payload migrate
   ```
 
+  After `migrate:create`, **open the generated migration and confirm it creates the
+  three `oauth_*` tables.** If it's empty (e.g. DB push is still enabled, or the
+  adapter already considers them present), `migrate` is a no-op and the tables are
+  never created — which surfaces later as `no such table: oauth_*` 500s.
+
 - **If the app uses dev push** (e.g. `@payloadcms/db-sqlite`, or Postgres in push
   mode): the schema is applied automatically the next time the app boots in dev —
   no command needed. For a production deploy with push disabled, create and run a
   migration as above.
 
-**Verify:** the three collections are queryable, e.g. in the admin UI under
-Collections, or `payload.count({ collection: 'oauth-clients' })` does not throw.
+**Verify:** open the admin UI → **Collections** and confirm **OAuth Clients**,
+**OAuth Auth Codes**, and **OAuth Tokens** appear. (Programmatically, a
+`payload run ./script.ts` that calls `payload.count({ collection: 'oauth-clients' })`
+should not throw — there is no bare REPL, so it must run inside a script.)
 
 ---
 
