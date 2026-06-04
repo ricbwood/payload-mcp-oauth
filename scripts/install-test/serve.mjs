@@ -23,6 +23,7 @@ import {
   portFree,
   provisionApp,
   readEnv,
+  refreshAppSource,
   restoreLockfile,
   seedAndMigrate,
   startDevServer,
@@ -74,6 +75,10 @@ try {
     ;({ appEnv } = await provisionApp({ appDir, port, log: (m) => console.log(`   • ${m}`) }))
   } else {
     console.log(`Reusing the existing install at ${appDir} (pass --fresh to rebuild).`)
+    // Re-sync the app source so the reused install reflects current repo source
+    // (e.g. the proxy.ts migration) instead of whatever was copied at first
+    // provision. Keeps node_modules + the DB, so reuse stays fast.
+    refreshAppSource(appDir)
     // Reuse the env from the prior provision so PMOAUTH_TOKEN_PEPPER / PAYLOAD_SECRET
     // stay stable across launches — otherwise OAuth tokens already stored in the
     // persisted DB (hashed with the old pepper) would stop validating. Only the

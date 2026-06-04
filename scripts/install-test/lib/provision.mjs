@@ -6,7 +6,7 @@
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:net'
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -129,6 +129,24 @@ export function startDevServer({ appDir, port, appEnv, inheritStdio = false }) {
 
 export function isProvisioned(appDir) {
   return existsSync(path.join(appDir, 'node_modules/.bin/next'))
+}
+
+/**
+ * Re-copy the example app's `src/` into an existing install so a reused install
+ * reflects the CURRENT repo source — picking up added/changed files and dropping
+ * removed ones (e.g. the middleware.ts → proxy.ts migration). Deletes + recopies
+ * `src/` (which holds proxy.ts, payload.config.ts, collections, the committed
+ * importMap, etc.) while leaving node_modules, the DB, and the
+ * provision-customised package.json/.env/.npmrc untouched. Heavy/structural
+ * changes (deps, configs) still need a `--fresh` reprovision.
+ */
+export function refreshAppSource(appDir) {
+  const dest = path.join(appDir, 'src')
+  rmSync(dest, { recursive: true, force: true })
+  cpSync(path.join(exampleApp, 'src'), dest, {
+    recursive: true,
+    filter: (s) => !path.basename(s).endsWith('.db'),
+  })
 }
 
 /** Restore the repo lockfile from a snapshot if a pnpm step perturbed it. Returns true if restored. */
