@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { describe, expect, it } from 'vitest'
 import { config, createMcpOAuthMiddleware, mcpOAuthMiddleware } from '../../../src/next-middleware.js'
+import { OAUTH_DISCOVERY_PATHS } from '../../../src/lib/paths.js'
 
 const MCP_HEADERS = {
   'content-type': 'application/json',
@@ -82,5 +83,13 @@ describe('exported config matcher', () => {
       '/.well-known/oauth-authorization-server',
       '/.well-known/oauth-protected-resource',
     ])
+  })
+
+  // config.matcher must be a static literal (Next can't resolve imported
+  // constants), so this guards against it drifting from OAUTH_DISCOVERY_PATHS.
+  it('stays in sync with OAUTH_DISCOVERY_PATHS', () => {
+    for (const p of OAUTH_DISCOVERY_PATHS) {
+      expect(config.matcher).toContain(p)
+    }
   })
 })

@@ -2,6 +2,7 @@ import type { MCPAccessSettings, MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { PayloadRequest, TypedUser } from 'payload'
 import { UnauthorizedError } from 'payload'
 import { validateAccessToken } from '../lib/validate.js'
+import { OAUTH_PRM_METADATA_PATH } from '../lib/paths.js'
 import { OAuthInvalidTokenError } from '../types.js'
 
 // Matches the toCamelCase used by @payloadcms/plugin-mcp for capability key lookup
@@ -116,7 +117,7 @@ export function wrapMcpEndpointHandler(
   issuer: string,
   canonicalPathname?: string,
 ): (req: PayloadRequest) => Promise<Response> {
-  const prmUrl = `${issuer.replace(/\/$/, '')}/.well-known/oauth-protected-resource`
+  const prmUrl = `${issuer.replace(/\/$/, '')}${OAUTH_PRM_METADATA_PATH}`
 
   function addResourceMetadata(wwwAuth: string | null): string {
     const resourceMeta = `resource_metadata="${prmUrl}"`
