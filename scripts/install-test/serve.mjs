@@ -22,6 +22,7 @@ import {
   makeAppEnv,
   portFree,
   provisionApp,
+  readEnv,
   restoreLockfile,
   seedAndMigrate,
   startDevServer,
@@ -73,7 +74,12 @@ try {
     ;({ appEnv } = await provisionApp({ appDir, port, log: (m) => console.log(`   • ${m}`) }))
   } else {
     console.log(`Reusing the existing install at ${appDir} (pass --fresh to rebuild).`)
-    appEnv = makeAppEnv(baseUrl)
+    // Reuse the env from the prior provision so PMOAUTH_TOKEN_PEPPER / PAYLOAD_SECRET
+    // stay stable across launches — otherwise OAuth tokens already stored in the
+    // persisted DB (hashed with the old pepper) would stop validating. Only the
+    // public server URL changes, to match the (possibly new) port.
+    const prior = readEnv(appDir)
+    appEnv = prior.PMOAUTH_TOKEN_PEPPER ? { ...prior, NEXT_PUBLIC_SERVER_URL: baseUrl } : makeAppEnv(baseUrl)
     writeEnv(appDir, appEnv)
     await seedAndMigrate(appDir, appEnv)
   }

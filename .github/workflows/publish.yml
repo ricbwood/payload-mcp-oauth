@@ -44,6 +44,15 @@ jobs:
       - name: Build the plugin
         run: pnpm --filter @brainwebuk/payload-plugin-mcp-oauth build
 
+      # Guard against publishing a tarball missing dist/ (e.g. a silent/partial
+      # build): the published version is immutable, so a broken one is permanent.
+      - name: Verify build output
+        working-directory: packages/plugin
+        run: |
+          for f in dist/index.js dist/index.cjs dist/next-middleware.js dist/admin/index.js dist/index.d.ts; do
+            test -s "$f" || { echo "::error::missing or empty build output: $f"; exit 1; }
+          done
+
       - name: Publish
         working-directory: packages/plugin
         run: npm publish --provenance --access public

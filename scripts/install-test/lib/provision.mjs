@@ -83,6 +83,25 @@ export function writeEnv(appDir, appEnv) {
   writeFileSync(path.join(appDir, '.env'), Object.entries(appEnv).map(([k, v]) => `${k}=${v}`).join('\n') + '\n')
 }
 
+/** Parse an app's .env back into an object (best-effort; returns {} if absent). */
+export function readEnv(appDir) {
+  try {
+    const raw = readFileSync(path.join(appDir, '.env'), 'utf8')
+    return Object.fromEntries(
+      raw
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#') && l.includes('='))
+        .map((l) => {
+          const i = l.indexOf('=')
+          return [l.slice(0, i), l.slice(i + 1)]
+        }),
+    )
+  } catch {
+    return {}
+  }
+}
+
 /** Boot Payload via the in-app seed fixture: pushes the schema and seeds the admin. */
 export async function seedAndMigrate(appDir, appEnv) {
   const out = await run('node', ['--import', 'tsx', 'install-seed.mjs'], {
