@@ -1,6 +1,10 @@
 import type { Access, CollectionAfterChangeHook, CollectionConfig } from 'payload'
 
-const isAuthenticated: Access = ({ req }) => Boolean(req.user)
+// Managed server-side only: the plugin endpoints use overrideAccess and the
+// admin TokensView reads via the Local API with its own per-user scoping. Deny
+// all public REST/GraphQL access — see clients.ts for the rationale (previously
+// any authenticated user could read all tokens or revoke/forge others').
+const denyPublicAccess: Access = () => false
 
 const cascadeRevokeAccessTokens: CollectionAfterChangeHook = async ({
   doc,
@@ -46,10 +50,10 @@ export const oauthTokensCollection: CollectionConfig = {
     hidden: true,
   },
   access: {
-    create: isAuthenticated,
-    read: isAuthenticated,
-    update: isAuthenticated,
-    delete: isAuthenticated,
+    create: denyPublicAccess,
+    read: denyPublicAccess,
+    update: denyPublicAccess,
+    delete: denyPublicAccess,
   },
   timestamps: false,
   hooks: {

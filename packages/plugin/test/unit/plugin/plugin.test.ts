@@ -40,6 +40,49 @@ describe('buildPlugin — config validation', () => {
   })
 })
 
+describe('buildPlugin — production hardening', () => {
+  const withEnv = (env: Record<string, string | undefined>, fn: () => void) => {
+    const prev: Record<string, string | undefined> = {}
+    for (const k of Object.keys(env)) {
+      prev[k] = process.env[k]
+      if (env[k] === undefined) delete process.env[k]
+      else process.env[k] = env[k]
+    }
+    try {
+      fn()
+    } finally {
+      for (const k of Object.keys(env)) {
+        if (prev[k] === undefined) delete process.env[k]
+        else process.env[k] = prev[k]
+      }
+    }
+  }
+
+  it('throws when the issuer is not https in production', () => {
+    withEnv({ NODE_ENV: 'production' }, () => {
+      expect(() => buildPlugin(makeConfig(), makeOptions({ issuer: 'http://cms.example.com' }))).toThrow(/https/i)
+    })
+  })
+
+  it('allows an https issuer in production', () => {
+    withEnv({ NODE_ENV: 'production' }, () => {
+      expect(() => buildPlugin(makeConfig(), makeOptions({ issuer: 'https://cms.example.com' }))).not.toThrow()
+    })
+  })
+
+  it('throws MISSING_PEPPER when no pepper is set outside development/test', () => {
+    withEnv({ NODE_ENV: 'production', PMOAUTH_TOKEN_PEPPER: undefined }, () => {
+      expect(() => buildPlugin(makeConfig(), makeOptions())).toThrow(/PMOAUTH_TOKEN_PEPPER/)
+    })
+  })
+
+  it('allows the dev fallback when NODE_ENV=test and no pepper is set', () => {
+    withEnv({ NODE_ENV: 'test', PMOAUTH_TOKEN_PEPPER: undefined }, () => {
+      expect(() => buildPlugin(makeConfig(), makeOptions())).not.toThrow()
+    })
+  })
+})
+
 describe('buildPlugin — order detection (T5.3)', () => {
   it('throws PLUGIN_ORDER when no /mcp endpoint is present', () => {
     expect(() => buildPlugin(makeConfig([]), makeOptions())).toThrow(PayloadMcpOAuthError)

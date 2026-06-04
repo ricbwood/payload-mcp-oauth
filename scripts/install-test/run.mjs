@@ -111,16 +111,29 @@ try {
   }
 
   // 6. Production safety: no pepper must refuse to boot (env pain point).
-  console.log('\n[6/6] Verifying production refuses to boot without a token pepper…')
-  let prodErr = ''
-  await run('node', ['--import', 'tsx', '-e', "import('./src/payload.config.ts').then(m=>m.default).then(c=>import('payload').then(p=>p.getPayload({config:c})))"], {
+  console.log('\n[6/6] Verifying production boot hardening (https issuer + token pepper)…')
+  const bootProbe = "import('./src/payload.config.ts').then(m=>m.default).then(c=>import('payload').then(p=>p.getPayload({config:c})))"
+  // (a) production with a non-https issuer (appEnv issuer is http://localhost) must be refused.
+  let prodHttpErr = ''
+  await run('node', ['--import', 'tsx', '-e', bootProbe], {
     cwd: appDir,
-    env: { ...process.env, ...appEnv, NODE_ENV: 'production', PMOAUTH_TOKEN_PEPPER: '' },
-  }).catch((e) => (prodErr = e.message))
+    env: { ...process.env, ...appEnv, NODE_ENV: 'production' },
+  }).catch((e) => (prodHttpErr = e.message))
+  check(
+    'env: NODE_ENV=production with a non-https issuer refuses to boot',
+    /https/i.test(prodHttpErr),
+    prodHttpErr ? `boot failed but not for https:\n${prodHttpErr.slice(-1200)}` : 'expected a boot failure but it started',
+  )
+  // (b) production with an https issuer but no pepper must be refused (mentioning the pepper).
+  let prodPepperErr = ''
+  await run('node', ['--import', 'tsx', '-e', bootProbe], {
+    cwd: appDir,
+    env: { ...process.env, ...appEnv, NODE_ENV: 'production', NEXT_PUBLIC_SERVER_URL: 'https://localhost', PMOAUTH_TOKEN_PEPPER: '' },
+  }).catch((e) => (prodPepperErr = e.message))
   check(
     'env: NODE_ENV=production without PMOAUTH_TOKEN_PEPPER refuses to boot (mentioning the pepper)',
-    /pepper|PMOAUTH_TOKEN_PEPPER/i.test(prodErr),
-    prodErr ? `boot failed but not for the pepper:\n${prodErr.slice(-1500)}` : 'expected a boot failure but it started',
+    /pepper|PMOAUTH_TOKEN_PEPPER/i.test(prodPepperErr),
+    prodPepperErr ? `boot failed but not for the pepper:\n${prodPepperErr.slice(-1200)}` : 'expected a boot failure but it started',
   )
 } catch (err) {
   console.error(`\nInstall test aborted: ${err.stack ?? err}`)

@@ -1,6 +1,9 @@
 import type { Access, CollectionAfterChangeHook, CollectionConfig } from 'payload'
 
-const isAuthenticated: Access = ({ req }) => Boolean(req.user)
+// Managed server-side only (plugin endpoints use overrideAccess; no admin view
+// reads this). Deny all public REST/GraphQL access — see clients.ts for the
+// rationale (previously any authenticated user could read/tamper these rows).
+const denyPublicAccess: Access = () => false
 
 const sweepExpiredCodes: CollectionAfterChangeHook = async ({ operation, req }) => {
   if (operation !== 'create') return
@@ -49,10 +52,10 @@ export const oauthAuthCodesCollection: CollectionConfig = {
     hidden: true,
   },
   access: {
-    create: isAuthenticated,
-    read: isAuthenticated,
-    update: isAuthenticated,
-    delete: isAuthenticated,
+    create: denyPublicAccess,
+    read: denyPublicAccess,
+    update: denyPublicAccess,
+    delete: denyPublicAccess,
   },
   timestamps: false,
   hooks: {

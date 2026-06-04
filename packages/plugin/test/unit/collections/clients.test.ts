@@ -56,15 +56,17 @@ describe('oauthClientsCollection', () => {
     expect(typeof oauthClientsCollection.access?.delete).toBe('function')
   })
 
-  it('restricts access to authenticated users', () => {
-    const mockReq = { user: { id: '1' } }
-    const mockReqAnon = { user: null }
-
-    const readFn = oauthClientsCollection.access?.read
-    if (typeof readFn !== 'function') throw new Error('read is not a function')
-
-    expect(readFn({ req: mockReq as never })).toBe(true)
-    expect(readFn({ req: mockReqAnon as never })).toBe(false)
+  it('denies ALL public REST/GraphQL access, even to authenticated users (server-managed only)', () => {
+    const access = oauthClientsCollection.access
+    // Even an authenticated user must be denied: these rows are only touched
+    // server-side via overrideAccess / the Local API. (A previous bug allowed
+    // any authenticated user to rewrite client redirectUris → auth-code theft.)
+    const ctx = { req: { user: { id: '1', collection: 'users' } } } as never
+    for (const op of ['create', 'read', 'update', 'delete'] as const) {
+      const fn = access?.[op]
+      if (typeof fn !== 'function') throw new Error(`${op} is not a function`)
+      expect(fn(ctx), `${op} must be denied`).toBe(false)
+    }
   })
 
   it('has timestamps enabled', () => {

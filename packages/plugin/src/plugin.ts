@@ -42,10 +42,19 @@ function resolveConfig(options: PayloadMcpOAuthConfig): ResolvedConfig {
   if (!issuer || typeof issuer !== 'string') {
     throw new PayloadMcpOAuthError('MISSING_ISSUER', 'payloadMcpOAuth: issuer is required')
   }
+  let issuerUrl: URL
   try {
-    new URL(issuer)
+    issuerUrl = new URL(issuer)
   } catch {
     throw new PayloadMcpOAuthError('INVALID_ISSUER', `payloadMcpOAuth: issuer must be a valid URL, got "${issuer}"`)
+  }
+  // In production the issuer (and every advertised OAuth endpoint) must be HTTPS:
+  // auth codes and bearer tokens travel to/from these URLs.
+  if (process.env['NODE_ENV'] === 'production' && issuerUrl.protocol !== 'https:') {
+    throw new PayloadMcpOAuthError(
+      'INSECURE_ISSUER',
+      `payloadMcpOAuth: issuer must use https:// in production, got "${issuer}"`,
+    )
   }
 
   if (!mcpPluginOptions || typeof mcpPluginOptions !== 'object') {
@@ -55,14 +64,18 @@ function resolveConfig(options: PayloadMcpOAuthConfig): ResolvedConfig {
     )
   }
 
+  // Require a real pepper everywhere EXCEPT explicit development/test. The
+  // insecure built-in fallback must never be used in production, staging, or any
+  // environment that doesn't deliberately set NODE_ENV=development|test — those
+  // are the cases where a missing pepper silently used the public DEV_PEPPER.
   const pepper = process.env['PMOAUTH_TOKEN_PEPPER']
-  if (!pepper || pepper.length < 32) {
-    if (process.env['NODE_ENV'] === 'production') {
-      throw new PayloadMcpOAuthError(
-        'MISSING_PEPPER',
-        'PMOAUTH_TOKEN_PEPPER must be set to a string of at least 32 characters in production',
-      )
-    }
+  const nodeEnv = process.env['NODE_ENV']
+  const isDevOrTest = nodeEnv === 'development' || nodeEnv === 'test'
+  if ((!pepper || pepper.length < 32) && !isDevOrTest) {
+    throw new PayloadMcpOAuthError(
+      'MISSING_PEPPER',
+      'PMOAUTH_TOKEN_PEPPER must be set to a string of at least 32 characters (the insecure dev fallback is only used when NODE_ENV is "development" or "test")',
+    )
   }
 
   return {
