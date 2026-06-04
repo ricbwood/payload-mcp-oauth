@@ -75,6 +75,19 @@ describe('verifyCsrfToken', () => {
     expect(verifyCsrfToken(`${Date.now()}.zzzznothex`, ...P)).toBe(false)
   })
 
+  it('rejects a non-string token without throwing (body values are untrusted)', () => {
+    // The param is typed string but comes from a parsed body, so a client can
+    // make it a number/object/array/boolean. These must return false, not throw.
+    for (const bad of [123, true, {}, [], { length: 9 }] as unknown[]) {
+      expect(verifyCsrfToken(bad as never, ...P)).toBe(false)
+    }
+  })
+
+  it('rejects an over-long timestamp segment without allocating', () => {
+    // dot beyond a 13-digit ms timestamp (allowing slack to 15) is rejected.
+    expect(verifyCsrfToken(`${'9'.repeat(20)}.${'a'.repeat(64)}`, ...P)).toBe(false)
+  })
+
   it('rejects an expired token (older than the max age)', () => {
     const minted = makeCsrfToken(...P, Date.now())
     // Advance the clock past the 10-minute TTL.
