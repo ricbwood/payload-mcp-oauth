@@ -1,7 +1,12 @@
 {
   "name": "@brainwebuk/payload-plugin-mcp-oauth",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "license": "MIT",
+  "author": {
+    "name": "Richard Wood",
+    "email": "ric@brainweb.co.uk",
+    "url": "https://www.brainweb.co.uk/"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/ricbwood/payload-mcp-oauth.git",

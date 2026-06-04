@@ -248,3 +248,7 @@ handler unchanged.
 ## License
 
 MIT
+
+---
+
+Built and maintained by [BrainWeb](https://www.brainweb.co.uk/), a web design studio in Norfolk, UK
