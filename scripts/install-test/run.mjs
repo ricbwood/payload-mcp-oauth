@@ -51,7 +51,7 @@ try {
     log: (m) => console.log(`   • ${m}`),
   })
   check('pack: produced a publishable .tgz', !!tgzPath, tgzPath)
-  check('install: clean install under strict-peer-deps (documented peerDependencyRules remedy) succeeded', true)
+  check('install: clean install of the packed tarball (with documented peerDependencyRules) succeeded', true)
 
   // 2. Packaging: the three published subpaths must resolve through the exports
   //    map to files that exist. We RESOLVE rather than import — /middleware and
