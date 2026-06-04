@@ -18,7 +18,11 @@ export const ADMIN = { email: 'install-test@example.com', password: 'install-tes
 
 const pluginDir = path.join(REPO_ROOT, 'packages/plugin')
 const exampleApp = path.join(REPO_ROOT, 'examples/payload-app')
-const EXCLUDE = new Set(['node_modules', '.next', 'dist', 'playwright-report', 'test-results', 'dev.db', 'payload.db'])
+// Also exclude pnpm-lock.yaml: the temp app repoints the plugin dep to the packed
+// tarball (the example's committed lockfile pins it as workspace:*), so the temp
+// app must resolve fresh against its customised package.json — a copied lockfile
+// would mismatch (and, under CI's frozen-by-default install, hard-fail).
+const EXCLUDE = new Set(['node_modules', '.next', 'dist', 'playwright-report', 'test-results', 'dev.db', 'payload.db', 'pnpm-lock.yaml'])
 
 /** Run a command to completion; resolve with combined output, reject on non-zero. */
 export function run(cmd, args, opts = {}) {
@@ -222,7 +226,10 @@ export async function provisionApp({ appDir, port, log = () => {} }) {
   writeFileSync(path.join(appDir, '.npmrc'), '\nstrict-peer-dependencies=true\n', { flag: 'a' })
 
   log('Installing (clean, strict peer deps) from the packed tarball…')
-  await run('pnpm', ['install', '--ignore-workspace', '--config.strict-peer-dependencies=true'], { cwd: appDir })
+  // --no-frozen-lockfile: the temp app has no lockfile (excluded above) and a
+  // freshly-generated package.json, so it must resolve from scratch. CI sets
+  // CI=true, which otherwise makes pnpm default to a frozen install and fail.
+  await run('pnpm', ['install', '--ignore-workspace', '--no-frozen-lockfile', '--config.strict-peer-dependencies=true'], { cwd: appDir })
 
   log('Regenerating the admin import map…')
   const payloadBin = path.join(appDir, 'node_modules/.bin/payload')
