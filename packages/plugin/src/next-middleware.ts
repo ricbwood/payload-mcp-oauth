@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { OAUTH_AS_METADATA_PATH, OAUTH_PRM_METADATA_PATH } from './lib/paths.js'
+import { OAUTH_DISCOVERY_PATHS } from './lib/paths.js'
 
 /**
  * Options for {@link createMcpOAuthMiddleware}.
@@ -69,10 +69,7 @@ export function createMcpOAuthMiddleware(
     const { method, nextUrl } = request
     const { pathname } = nextUrl
 
-    if (
-      rewriteWellKnown &&
-      (pathname === OAUTH_AS_METADATA_PATH || pathname === OAUTH_PRM_METADATA_PATH)
-    ) {
+    if (rewriteWellKnown && (OAUTH_DISCOVERY_PATHS as readonly string[]).includes(pathname)) {
       const rewritten = nextUrl.clone()
       rewritten.pathname = `${apiRoute}${pathname}`
       return NextResponse.rewrite(rewritten)
