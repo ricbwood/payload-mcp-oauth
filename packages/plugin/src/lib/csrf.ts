@@ -39,13 +39,21 @@ export function verifyCsrfToken(
   codeChallenge: string,
   maxAgeMs: number = DEFAULT_MAX_AGE_MS,
 ): boolean {
-  if (!token) return false
+  // Guard the wire format before doing any work on it. `token` is typed as
+  // string but originates from a parsed request body, so a malicious client can
+  // make it a number/object/array at runtime — calling string methods on those
+  // would throw. A timestamp is at most 13 digits and the MAC is always 64 hex
+  // chars (HMAC-SHA-256), so anything outside those bounds is rejected cheaply
+  // before we hex-decode or allocate.
+  if (typeof token !== 'string') return false
 
   const dot = token.indexOf('.')
-  if (dot <= 0) return false
+  if (dot <= 0 || dot > 15) return false
+
+  const mac = token.slice(dot + 1)
+  if (mac.length !== 64) return false
 
   const issuedAt = Number(token.slice(0, dot))
-  const mac = token.slice(dot + 1)
   if (!Number.isInteger(issuedAt) || issuedAt <= 0) return false
 
   // Reject expired tokens and tokens minted in the future beyond clock skew.

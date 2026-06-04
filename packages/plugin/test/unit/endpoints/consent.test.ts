@@ -157,6 +157,26 @@ describe('makeConsentHandler', () => {
     )
   })
 
+  it('accepts a numeric user_id that matches the session (integer Payload IDs)', async () => {
+    // Payload IDs are often integers; a JSON client may echo user_id back as a
+    // number. It must not spuriously 403 against the String(session id) — the
+    // body value is coerced before comparison.
+    const numericBody = {
+      ...VALID_BODY,
+      user_id: 123,
+      csrf_token: makeCsrfToken('123', 'client-1', REGISTERED_URI, CODE_CHALLENGE),
+    }
+    const req = makeReq(numericBody, 'POST', { id: 123 })
+    const res = await makeConsentHandler()(req as never)
+    expect(res.status).toBe(302)
+    expect(req.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'oauth-auth-codes',
+        data: expect.objectContaining({ userId: '123' }),
+      }),
+    )
+  })
+
   it('rejects an expired csrf_token with 400', async () => {
     const stale = makeCsrfToken('user-1', 'client-1', REGISTERED_URI, CODE_CHALLENGE, Date.now() - 11 * 60 * 1000)
     const req = makeReq({ ...VALID_BODY, csrf_token: stale }, 'POST', { id: 'user-1' })

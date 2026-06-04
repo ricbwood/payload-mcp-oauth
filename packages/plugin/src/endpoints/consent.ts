@@ -27,7 +27,10 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
       const codeChallenge = body['code_challenge'] as string | undefined
       const codeChallengeMethod = body['code_challenge_method'] as string | undefined
       const state = body['state'] as string | undefined
-      const bodyUserId = body['user_id'] as string | undefined
+      // Coerce to string: Payload IDs are often integers, so a JSON client may
+      // send user_id as a number. Without this, the strict !== check below would
+      // spuriously 403 a legitimate request (123 !== "123").
+      const bodyUserId = body['user_id'] != null ? String(body['user_id']) : undefined
       const csrfToken = body['csrf_token'] as string | undefined
       const scope = (body['scope'] as string | undefined) ?? ''
       const resource = (body['resource'] as string | undefined) ?? ''
