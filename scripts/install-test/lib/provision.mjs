@@ -177,23 +177,34 @@ export async function provisionApp({ appDir, port, log = () => {} }) {
   // Drop workspace-coupled lifecycle scripts that assume the monorepo.
   delete pkg.scripts.prebuild
   delete pkg.scripts.postbuild
-  // Allow native build scripts (sharp etc.) in the standalone install.
-  pkg.pnpm = { ...(pkg.pnpm ?? {}), onlyBuiltDependencies: ['sharp', 'esbuild', 'unrs-resolver'] }
+  // Allow native build scripts (sharp etc.) in the standalone install, and apply
+  // the SAME peerDependencyRules a real strict-mode consumer is told to use
+  // (INSTALL_FOR_AGENTS.md Step 1). This surgically allows the harmless upstream
+  // `mcp-handler → @modelcontextprotocol/sdk` version mismatch (and ignores the
+  // optional @payloadcms/ui peers the example app pulls in) WITHOUT globally
+  // disabling strict mode. Installing under strict + this remedy proves the
+  // documented fix actually works — rather than masking the failure.
+  pkg.pnpm = {
+    ...(pkg.pnpm ?? {}),
+    onlyBuiltDependencies: ['sharp', 'esbuild', 'unrs-resolver'],
+    peerDependencyRules: {
+      ignoreMissing: ['monaco-editor', 'yjs'],
+      allowedVersions: { 'mcp-handler>@modelcontextprotocol/sdk': '*' },
+    },
+  }
   writeFileSync(pkgPath, JSON.stringify(pkg, null, 2))
 
   writeEnv(appDir, appEnv)
 
-  // The monorepo runs with strict-peer-dependencies=true and silences the
-  // upstream `mcp-handler → @modelcontextprotocol/sdk` version mismatch via
-  // peerDependencyRules. The isolated temp app doesn't inherit those rules, so
-  // a strict global config (the repo's, or the user's ~/.npmrc) would hard-fail
-  // the install on that harmless mismatch. Force non-strict here — both via the
-  // project .npmrc (beats ~/.npmrc) and the CLI flag (beats everything) — so the
-  // install is deterministic regardless of the host's pnpm config.
-  writeFileSync(path.join(appDir, '.npmrc'), '\nstrict-peer-dependencies=false\n', { flag: 'a' })
+  // Force strict-peer-dependencies ON (deterministically, regardless of the host's
+  // pnpm config) so the install exercises the failure-prone condition a strict
+  // consumer hits. With the peerDependencyRules above it must still install clean;
+  // without them it would fail with ERR_PNPM_PEER_DEP_ISSUES — which is exactly the
+  // regression this guards against.
+  writeFileSync(path.join(appDir, '.npmrc'), '\nstrict-peer-dependencies=true\n', { flag: 'a' })
 
-  log('Installing (clean) from the packed tarball…')
-  await run('pnpm', ['install', '--ignore-workspace', '--config.strict-peer-dependencies=false'], { cwd: appDir })
+  log('Installing (clean, strict peer deps) from the packed tarball…')
+  await run('pnpm', ['install', '--ignore-workspace', '--config.strict-peer-dependencies=true'], { cwd: appDir })
 
   log('Regenerating the admin import map…')
   const payloadBin = path.join(appDir, 'node_modules/.bin/payload')
