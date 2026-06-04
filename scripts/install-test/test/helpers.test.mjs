@@ -8,12 +8,13 @@
 
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 
 import { decodeEntities, parseConsentFields } from '../lib/handshake.mjs'
-import { makeAppEnv, readEnv, refreshAppSource, writeEnv } from '../lib/provision.mjs'
+import { freePort, makeAppEnv, portFree, readEnv, refreshAppSource, writeEnv } from '../lib/provision.mjs'
 
 test('decodeEntities decodes HTML entities and avoids double-unescaping', () => {
   assert.equal(decodeEntities('a&amp;b'), 'a&b')
@@ -100,5 +101,31 @@ test('refreshAppSource drops stale src files and preserves the install state', (
     assert.match(readFileSync(path.join(app, '.env'), 'utf8'), /keep/, '.env preserved')
   } finally {
     rmSync(root, { recursive: true, force: true })
+  }
+})
+
+test('freePort returns a usable OS-assigned port', async () => {
+  const p = await freePort()
+  assert.equal(typeof p, 'number')
+  assert.ok(p > 0 && p < 65536, `port ${p} in range`)
+})
+
+test('portFree reports free vs busy ports without throwing', async () => {
+  // A just-released port should read as free.
+  assert.equal(await portFree(await freePort()), true)
+
+  // A port we hold open should read as busy — and probing it must not leave an
+  // unhandled 'error' (the regression this guards: errors after listen succeeds).
+  const srv = createServer()
+  await new Promise((resolve, reject) => {
+    srv.once('error', reject)
+    srv.listen(0, resolve)
+  })
+  try {
+    const busy = srv.address().port
+    assert.equal(await portFree(busy), false)
+    assert.equal(await portFree(busy), false) // repeatable (no consumed once-listener)
+  } finally {
+    await new Promise((resolve) => srv.close(resolve))
   }
 })

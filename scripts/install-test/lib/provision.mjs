@@ -44,9 +44,16 @@ function probePort(port) {
   return new Promise((resolve) => {
     const srv = createServer()
     srv.unref()
-    srv.once('error', () => resolve(null))
+    // listen failed (e.g. EADDRINUSE) → port not free. The server never opened,
+    // so there's nothing to close.
+    const onListenError = () => resolve(null)
+    srv.once('error', onListenError)
     srv.once('listening', () => {
       const { port: bound } = srv.address()
+      // Listen succeeded: stop treating errors as "busy", and swallow any error
+      // emitted during the async close so it can't resolve(null) or throw.
+      srv.removeListener('error', onListenError)
+      srv.on('error', () => {})
       srv.close(() => resolve(bound))
     })
     srv.listen(port)
