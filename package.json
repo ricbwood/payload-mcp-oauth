@@ -46,6 +46,13 @@
       "allowedVersions": {
         "mcp-handler>@modelcontextprotocol/sdk": "1.27.1"
       }
+    },
+    "packageExtensions": {
+      "@payloadcms/drizzle": {
+        "dependencies": {
+          "drizzle-kit": "0.31.7"
+        }
+      }
     }
   }
 }
