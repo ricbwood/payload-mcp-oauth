@@ -41,7 +41,14 @@ export function makeRegisterHandler(): PayloadHandler {
       } catch {
         return oauthErrorResponse(400, 'invalid_redirect_uri', `Invalid redirect_uri: ${uri}`)
       }
-      const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'
+      // RFC 6749 §3.1.2: the redirection endpoint URI MUST NOT include a fragment.
+      if (parsed.hash) {
+        return oauthErrorResponse(400, 'invalid_redirect_uri', `redirect_uri must not contain a fragment: ${uri}`)
+      }
+      // Allow loopback for local development over http (RFC 8252 §7.3): IPv4,
+      // hostname, and IPv6 [::1]. URL parsing reports the IPv6 host bracketed.
+      const isLocalhost =
+        parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '[::1]'
       if (parsed.protocol !== 'https:' && !isLocalhost) {
         return oauthErrorResponse(400, 'invalid_redirect_uri', `redirect_uri must use HTTPS: ${uri}`)
       }
@@ -68,6 +75,17 @@ export function makeRegisterHandler(): PayloadHandler {
       }
     }
 
+    // Cap free-text client metadata that is persisted, to prevent DB bloat / DoS
+    // via oversized values (mirrors the client_name cap above).
+    const softwareId = body['software_id']
+    if (softwareId !== undefined && (typeof softwareId !== 'string' || softwareId.length > 100)) {
+      return oauthErrorResponse(400, 'invalid_client_metadata', 'software_id must be a string of at most 100 characters')
+    }
+    const softwareVersion = body['software_version']
+    if (softwareVersion !== undefined && (typeof softwareVersion !== 'string' || softwareVersion.length > 100)) {
+      return oauthErrorResponse(400, 'invalid_client_metadata', 'software_version must be a string of at most 100 characters')
+    }
+
     const clientId = randomUUID()
     const trimmedName = clientName.trim()
 
@@ -81,8 +99,8 @@ export function makeRegisterHandler(): PayloadHandler {
         tokenEndpointAuthMethod: 'none',
         grantTypes: ['authorization_code', 'refresh_token'],
         responseTypes: ['code'],
-        softwareId: typeof body['software_id'] === 'string' ? body['software_id'] : undefined,
-        softwareVersion: typeof body['software_version'] === 'string' ? body['software_version'] : undefined,
+        softwareId: typeof softwareId === 'string' ? softwareId : undefined,
+        softwareVersion: typeof softwareVersion === 'string' ? softwareVersion : undefined,
         isActive: true,
       },
     })

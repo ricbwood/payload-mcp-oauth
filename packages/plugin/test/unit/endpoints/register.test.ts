@@ -53,6 +53,50 @@ describe('makeRegisterHandler', () => {
     expect((await makeRegisterHandler()(req as never)).status).toBe(201)
   })
 
+  it('accepts IPv6 loopback [::1] http redirect_uri', async () => {
+    const req = makeReq({ client_name: 'App', redirect_uris: ['http://[::1]:3000/cb'] })
+    expect((await makeRegisterHandler()(req as never)).status).toBe(201)
+  })
+
+  it('rejects a redirect_uri containing a fragment (RFC 6749 §3.1.2)', async () => {
+    const res = await makeRegisterHandler()(
+      makeReq({ client_name: 'App', redirect_uris: ['https://a.com/cb#frag'] }) as never,
+    )
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_redirect_uri')
+  })
+
+  it('caps software_id at 100 characters', async () => {
+    const res = await makeRegisterHandler()(
+      makeReq({ client_name: 'App', redirect_uris: ['https://a.com/cb'], software_id: 'x'.repeat(101) }) as never,
+    )
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_client_metadata')
+  })
+
+  it('caps software_version at 100 characters', async () => {
+    const res = await makeRegisterHandler()(
+      makeReq({ client_name: 'App', redirect_uris: ['https://a.com/cb'], software_version: 'x'.repeat(101) }) as never,
+    )
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_client_metadata')
+  })
+
+  it('accepts software_id / software_version within the cap', async () => {
+    const req = makeReq({
+      client_name: 'App',
+      redirect_uris: ['https://a.com/cb'],
+      software_id: 'my-software',
+      software_version: '1.2.3',
+    })
+    expect((await makeRegisterHandler()(req as never)).status).toBe(201)
+    expect(req.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ softwareId: 'my-software', softwareVersion: '1.2.3' }),
+      }),
+    )
+  })
+
   it('rejects invalid redirect_uri URL', async () => {
     const res = await makeRegisterHandler()(makeReq({ client_name: 'App', redirect_uris: ['not-a-url'] }) as never)
     expect(res.status).toBe(400)
