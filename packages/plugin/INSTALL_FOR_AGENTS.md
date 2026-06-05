@@ -178,6 +178,11 @@ In `NODE_ENV=production` the plugin **throws on boot** if `PMOAUTH_TOKEN_PEPPER`
 is missing or shorter than 32 chars. In development an insecure fallback is used
 with a warning.
 
+Also ensure Payload's `serverURL` is the **same** public origin as
+`NEXT_PUBLIC_SERVER_URL` (most starters set it via `getServerSideURL()`). The
+consent flow uses a first-party session cookie; a `serverURL`/origin mismatch can
+make the Approve POST lose its session.
+
 **Verify:** a production build boots without a `PMOAUTH_TOKEN_PEPPER` error.
 
 ---
@@ -262,7 +267,7 @@ screen.
 | **Every** route 500s; log: *"can't recognize the exported `config` field … it mustn't be reexported"* | `config` re-exported from the plugin in `proxy.ts`/`middleware.ts` | Step 3: declare `config` as a local literal in the file |
 | `/.well-known/...` returns the app's HTML or 404 | `proxy.ts`/`middleware.ts` missing, or `matcher` lacks the well-known paths | Step 3: add the file with the matcher shown |
 | `The "middleware" file convention is deprecated` warning (Next 16) | Using `middleware.ts` on Next 16 | Step 3: rename to `src/proxy.ts`, export as `proxy` (or run `npx @next/codemod middleware-to-proxy .`) |
-| Consent screen renders, but **Approve** → `401 access_denied / "Authentication required"` | Behind a reverse proxy (Firebase App Hosting, Cloud Run, etc.) Payload drops cookie auth on the consent POST (the GET render has no `Origin`, the POST does and isn't trusted) | Add the public origin to Payload's `csrf` array in `payload.config`: `csrf: [getServerSideURL()].filter(Boolean)` (and confirm `serverURL` matches) |
+| Consent screen renders, but **Approve** → `401 access_denied / "Authentication required"` | Plugin bug ≤ 0.3.0: consent page sent `Referrer-Policy: no-referrer` → browser sent `Origin: null` on the POST → Payload dropped the session (GET render has no Origin, so it worked) | Upgrade to **≥ 0.3.1** (fixed). If it persists, confirm `serverURL` / `NEXT_PUBLIC_SERVER_URL` exactly matches the public origin (scheme, host, no trailing slash) |
 | **OAuth Clients / OAuth Tokens** absent from the MCP nav group, or route shows *"Nothing found"* | Logged-in user not authorised by `adminAccess` (default: must belong to `userCollection`) | Log in as a `userCollection` user, or pass a custom `adminAccess` for mixed-role apps (see Plugin options) |
 | `migrate` fails: *"table … already exists"* | Ran `migrate` against a DB already created by dev push | Step 6: pick one workflow — don't mix dev push and migrations |
 | OAuth requests 500 / "no such table: oauth_*" | Schema not applied | Step 6: run migrations, or boot in dev to push |
