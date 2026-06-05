@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import { makeAuthorizeHandler } from '../../../src/endpoints/authorize.js'
 import { verifyCsrfToken } from '../../../src/lib/csrf.js'
 
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
+
+const MCP_OPTIONS: MCPPluginConfig = {
+  collections: { posts: { enabled: true } },
+}
 
 const REGISTERED_URI = 'https://example.com/cb'
 const VALID_CLIENT = {
@@ -51,10 +56,8 @@ describe('makeAuthorizeHandler', () => {
     expect(res.headers.get('X-Frame-Options')).toBe('DENY')
   })
 
-  it('discloses that approval grants all enabled tools (consent integrity, no per-scope narrowing yet)', async () => {
-    // The token is granted the operator-configured capability set regardless of the
-    // requested scope (see issue #35). The consent screen must say so plainly rather
-    // than implying the listed scopes bound the grant.
+  it('discloses full-grant when scope is absent (all tools enabled on this server)', async () => {
+    // No scope → full operator grant; the note must reflect this.
     const res = await makeAuthorizeHandler()(makeReq(VALID_QUERY, { id: 'user-1' }) as never)
     const html = await res.text()
     expect(html).toMatch(/acting as you/i)
@@ -157,5 +160,32 @@ describe('makeAuthorizeHandler', () => {
     const html = await res.text()
     expect(html).toContain('action="/cms/oauth/consent"')
     expect(html).not.toContain('action="/api/oauth/consent"')
+  })
+
+  it('redirects with invalid_scope for an unknown scope token (scope enforcement active)', async () => {
+    const res = await makeAuthorizeHandler('/admin', undefined, '/api/oauth/consent', MCP_OPTIONS)(
+      makeReq({ ...VALID_QUERY, scope: 'unknown:read' }, { id: 'user-1' }) as never,
+    )
+    expect(res.status).toBe(302)
+    expect(res.headers.get('Location')).toContain('error=invalid_scope')
+  })
+
+  it('accepts a valid scope token and shows the per-scope note when enforcement is active', async () => {
+    const res = await makeAuthorizeHandler('/admin', undefined, '/api/oauth/consent', MCP_OPTIONS)(
+      makeReq({ ...VALID_QUERY, scope: 'posts:read' }, { id: 'user-1' }) as never,
+    )
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('Read posts')
+    expect(html).toContain('Only the capabilities listed above will be granted')
+  })
+
+  it('accepts empty scope without scope validation and shows the full-grant note', async () => {
+    const res = await makeAuthorizeHandler('/admin', undefined, '/api/oauth/consent', MCP_OPTIONS)(
+      makeReq({ ...VALID_QUERY, scope: undefined }, { id: 'user-1' }) as never,
+    )
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toMatch(/all tools enabled on this server/i)
   })
 })

@@ -197,17 +197,17 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     {
       path: '/oauth/authorize',
       method: 'get',
-      handler: withRateLimit(rateLimits.authorize, makeAuthorizeHandler('/admin', undefined, `${apiBase}/oauth/consent`)),
+      handler: withRateLimit(rateLimits.authorize, makeAuthorizeHandler('/admin', undefined, `${apiBase}/oauth/consent`, resolved.mcpPluginOptions)),
     },
     {
       path: '/oauth/consent',
       method: 'post',
-      handler: makeConsentHandler(resolved.authCodeTtlSeconds, resolved.issuer),
+      handler: makeConsentHandler(resolved.authCodeTtlSeconds, resolved.issuer, resolved.mcpPluginOptions),
     },
     {
       path: '/oauth/token',
       method: 'post',
-      handler: withCors(withRateLimit(rateLimits.token, makeTokenHandler())),
+      handler: withCors(withRateLimit(rateLimits.token, makeTokenHandler(resolved.mcpPluginOptions))),
     },
     { path: '/oauth/token', method: 'options', handler: corsPreflightHandler },
     {

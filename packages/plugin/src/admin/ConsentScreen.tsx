@@ -70,19 +70,14 @@ export function ConsentScreen({
         <h1>Authorize <strong>{clientName}</strong></h1>
         <p>
           Approving will let <strong>{clientName}</strong> access your Payload CMS instance{' '}
-          <strong>acting as you</strong>. It requested:
+          <strong>acting as you</strong>. The following will be granted:
         </p>
         <ul className="scope-list">
           {labels.map((label) => (
             <li key={label}>{label}</li>
           ))}
         </ul>
-        <p className="note">
-          The items above are what the application asked for. This MCP server does not yet restrict
-          access per-permission &mdash; approving grants the application{' '}
-          <strong>all tools enabled on this server</strong>, on your behalf. Only approve
-          applications you trust.
-        </p>
+        <p className="note">Only approve applications you trust.</p>
         <form method="POST" action="/api/oauth/consent">
           <input type="hidden" name="client_id" value={clientId} />
           <input type="hidden" name="redirect_uri" value={redirectUri} />

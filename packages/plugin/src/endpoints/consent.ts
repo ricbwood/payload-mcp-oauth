@@ -1,9 +1,11 @@
 import type { PayloadHandler } from 'payload'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import { verifyCsrfToken, consumeCsrfNonce } from '../lib/csrf.js'
 import { issueAuthCode } from '../lib/auth-codes.js'
+import { scopeToCapabilities } from '../lib/scope.js'
 import { oauthErrorResponse, redirectResponse, parseBody } from './helpers.js'
 
-export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): PayloadHandler {
+export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = '', mcpPluginOptions?: MCPPluginConfig): PayloadHandler {
   return async (req) => {
     try {
       if (req.method !== 'POST') {
@@ -56,6 +58,14 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
       // form cannot be submitted twice (prevents duplicate auth code issuance).
       if (!(await consumeCsrfNonce(req.payload, csrfNonce, sessionUserId))) {
         return oauthErrorResponse(400, 'invalid_request', 'CSRF nonce already used or expired')
+      }
+
+      // Re-validate scope at consent time to prevent tampering with the hidden scope field
+      if (scope && mcpPluginOptions) {
+        const scopeResult = scopeToCapabilities(scope, mcpPluginOptions)
+        if (!scopeResult.valid) {
+          return oauthErrorResponse(400, 'invalid_scope', `Unknown or unsupported scope: ${scopeResult.invalidScopes.join(' ')}`)
+        }
       }
 
       if (decision === 'deny') {
