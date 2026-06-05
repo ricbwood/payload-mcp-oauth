@@ -163,6 +163,13 @@ In development a built-in insecure pepper is used if `PMOAUTH_TOKEN_PEPPER` is
 unset (with a warning). In `NODE_ENV=production` the plugin **throws on boot** if
 it is missing or shorter than 32 characters.
 
+> **Keep `serverURL` consistent.** The authorize/consent flow signs the user in
+> with a first-party Payload **session cookie**, so Payload's `serverURL` must be
+> the same public origin clients reach (the same value as `NEXT_PUBLIC_SERVER_URL`).
+> Most starters already do this via `getServerSideURL()`. If `serverURL` doesn't
+> match the origin the browser actually uses, the consent **Approve** POST can
+> lose its session — see Troubleshooting.
+
 ### 5. Regenerate the admin import map (if your app uses one)
 
 This plugin registers no custom admin components, so it doesn't *require* an import
@@ -266,7 +273,7 @@ handler unchanged.
 | `/.well-known/...` returns the app's HTML / 404 | `proxy.ts` / `middleware.ts` missing or its `matcher` doesn't include the well-known paths (step 3). |
 | **Every** route 500s; log says *"can't recognize the exported `config` field … it mustn't be reexported"* | `config` was re-exported from `…/middleware` instead of declared as a local literal in your `proxy.ts` / `middleware.ts` (step 3). |
 | `The "middleware" file convention is deprecated` warning (Next 16) | Rename `src/middleware.ts` → `src/proxy.ts` and export the handler as `proxy` (step 3). |
-| Consent screen renders, but **Approve** returns `401 access_denied / "Authentication required"` | Behind a reverse proxy (Firebase App Hosting, Cloud Run, Fly, etc.) Payload drops cookie auth on the consent **POST** because the request `Origin` isn't trusted — the `GET` consent render has no `Origin` so it works, the `POST` doesn't. Add your public origin to Payload's **`csrf`** array (and confirm `serverURL` matches it): `csrf: [getServerSideURL()].filter(Boolean)`. |
+| Consent screen renders, but **Approve** returns `401 access_denied / "Authentication required"` | Plugin bug in **≤ 0.3.0**: the consent page sent `Referrer-Policy: no-referrer`, so browsers sent `Origin: null` on the Approve POST and Payload dropped the session (the `GET` render has no `Origin`, so it worked; the `POST` didn't). **Fixed in 0.3.1 — upgrade.** If it persists on ≥ 0.3.1, your `serverURL` doesn't match the origin the browser uses — check `NEXT_PUBLIC_SERVER_URL` (exact scheme + host, no trailing slash). |
 | **OAuth Clients / OAuth Tokens** missing from the admin nav, or their route shows *"Nothing found"* | The logged-in user isn't authorised by `adminAccess`. By default they must belong to `userCollection`; for mixed-role apps pass a custom `adminAccess` (see *Admin UI & access*). |
 | `migrate` fails with *"table … already exists"* | You ran `migrate` against a DB already created by dev push — pick one workflow (step 6). |
 | Boots fine in dev, throws on deploy | `PMOAUTH_TOKEN_PEPPER` not set in production (step 4). |

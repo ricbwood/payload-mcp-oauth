@@ -141,7 +141,7 @@ These mitigations apply to the entire plugin, not a single threat:
 | Control | Description | Tasks |
 |---------|-------------|-------|
 | HTTPS required | Boot check refuses to start in production without `NEXT_PUBLIC_SERVER_URL` starting with `https://`. | T8.3 |
-| Security headers | `Cache-Control: no-store`, `Strict-Transport-Security`, and `X-Content-Type-Options` on all JSON OAuth responses (`jsonResponse`). Consent/authorize HTML also adds `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a strict CSP. | T8.1 |
+| Security headers | `Cache-Control: no-store`, `Strict-Transport-Security`, and `X-Content-Type-Options` on all JSON OAuth responses (`jsonResponse`). Consent/authorize HTML also adds `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` (NOT `no-referrer` — that makes browsers send `Origin: null` on the consent POST, which Payload rejects → 401; see row I6), and a strict CSP. | T8.1 |
 | No-store cache headers | `Cache-Control: no-store` on all token and auth code responses. | T8.1 |
 | Rate limiting | Per-IP limits on all public OAuth endpoints. The key is the client IP **alone** (`ip:<ip>`); a client-supplied identifier (`client_id` / `client_name`) is deliberately never part of the key, since rotating it would mint a fresh bucket and bypass the per-IP limit. IP is taken from `x-forwarded-for`; operators behind a reverse proxy should ensure only one trusted proxy sets this header. | T4.8 |
 | Audit logging | Structured log entries for all significant auth events, with no secret material. | T8.2 |
