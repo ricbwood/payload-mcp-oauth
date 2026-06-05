@@ -28,7 +28,10 @@ export function htmlResponse(html: string, extraHeaders: Record<string, string> 
       'Cache-Control': 'no-store',
       'X-Frame-Options': 'DENY',
       'X-Content-Type-Options': 'nosniff',
-      'Referrer-Policy': 'no-referrer',
+      // Not 'no-referrer': that makes browsers send `Origin: null` on form POSTs
+      // from this page, which Payload rejects for cookie auth (→ 401). See the
+      // detailed note in authorize.ts. Matches threat-model row I6.
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
       "Content-Security-Policy": "default-src 'none'; form-action 'self'; base-uri 'none'",
       ...extraHeaders,
     },

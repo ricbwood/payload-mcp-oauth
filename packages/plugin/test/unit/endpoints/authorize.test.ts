@@ -128,7 +128,11 @@ describe('makeAuthorizeHandler', () => {
   it('sets security headers on consent HTML', async () => {
     const res = await makeAuthorizeHandler()(makeReq(VALID_QUERY, { id: 'user-1' }) as never)
     expect(res.headers.get('Content-Security-Policy')).toBeTruthy()
-    expect(res.headers.get('Referrer-Policy')).toBe('no-referrer')
+    // MUST NOT be 'no-referrer': that makes the browser send `Origin: null` on the
+    // Approve form POST, which Payload rejects for cookie auth → consent 401s.
+    // strict-origin-when-cross-origin keeps the real Origin on the same-origin POST.
+    expect(res.headers.get('Referrer-Policy')).toBe('strict-origin-when-cross-origin')
+    expect(res.headers.get('Referrer-Policy')).not.toBe('no-referrer')
   })
 
   it('embeds a server-signed CSRF token bound to user/client/redirect/challenge', async () => {
