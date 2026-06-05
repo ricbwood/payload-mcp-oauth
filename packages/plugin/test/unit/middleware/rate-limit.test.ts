@@ -44,8 +44,12 @@ describe('rateLimitKey', () => {
     expect(rateLimitKey('1.2.3.4')).toBe('ip:1.2.3.4')
   })
 
-  it('uses unknown for missing IP', () => {
+  it('coalesces missing / empty / whitespace IP to a sentinel (never the malformed "ip:")', () => {
+    // `${'' ?? 'unknown'}` is '' — empty/whitespace must not yield the broken
+    // key `ip:`, which would lump all header-less requests into one bucket.
     expect(rateLimitKey(undefined)).toBe('ip:unknown')
+    expect(rateLimitKey('')).toBe('ip:unknown')
+    expect(rateLimitKey('   ')).toBe('ip:unknown')
   })
 
   it('produces the SAME key regardless of any client identifier (rotation cannot bypass)', () => {

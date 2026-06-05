@@ -55,9 +55,25 @@ async function handleAuthCode(req: PayloadRequest, body: Record<string, unknown>
     return oauthErrorResponse(400, 'invalid_grant', 'Authorization code is invalid, expired, or already used')
   }
 
-  const capabilities = mcpPluginOptions
-    ? scopeToCapabilities(ctx.scope ?? '', mcpPluginOptions).capabilities
-    : {}
+  // Resolve the granted capabilities from the requested scope. The `valid` flag
+  // MUST be honoured: scopeToCapabilities returns capabilities:{} for BOTH an
+  // empty scope (intentional full grant, applied by the wrap-mcp fallback) AND
+  // an invalid scope (grant nothing). Storing {} for the invalid case would let
+  // wrap-mcp widen it back to FULL capabilities — a privilege escalation that
+  // defeats narrowing (e.g. the operator disabled a collection after the auth
+  // code was issued). So an invalid scope is rejected here, never issued.
+  let capabilities: Record<string, unknown> = {}
+  if (mcpPluginOptions) {
+    const scopeResult = scopeToCapabilities(ctx.scope ?? '', mcpPluginOptions)
+    if (!scopeResult.valid) {
+      return oauthErrorResponse(
+        400,
+        'invalid_scope',
+        `Requested scope can no longer be granted: ${scopeResult.invalidScopes.join(' ')}`,
+      )
+    }
+    capabilities = scopeResult.capabilities
+  }
 
   const pair = await issueTokenPair(req.payload, {
     clientId: ctx.clientId,

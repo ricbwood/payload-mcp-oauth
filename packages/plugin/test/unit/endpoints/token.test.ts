@@ -105,6 +105,26 @@ describe('makeTokenHandler — authorization_code grant', () => {
     expect(data['capabilities']).toEqual({})
   })
 
+  it('rejects with invalid_scope when the code scope is no longer grantable (no full-grant escalation)', async () => {
+    // Scope was valid at /authorize but the collection is now disabled (here
+    // 'secrets' is absent from MCP_OPTIONS). scopeToCapabilities → valid:false,
+    // capabilities:{}. Storing {} would let wrap-mcp widen it to FULL caps, so
+    // the exchange must be rejected rather than issue an (escalated) token.
+    const authCode = 'pmoauth_ac_' + crypto.randomBytes(32).toString('base64url')
+    const req = makeReq(
+      { grant_type: 'authorization_code', code: authCode, client_id: 'client-1', redirect_uri: 'https://example.com/cb', code_verifier: VERIFIER },
+      [makeCodeDoc({ scope: 'secrets:read' })],
+    )
+    const res = await makeTokenHandler(MCP_OPTIONS)(req as never)
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_scope')
+    // No token row was created.
+    const createdToken = req.payload.create.mock.calls.find(
+      (c: [{ collection: string }]) => c[0].collection === 'oauth-tokens',
+    )
+    expect(createdToken).toBeUndefined()
+  })
+
   it('returns invalid_grant for bad code', async () => {
     const req = makeReq(
       { grant_type: 'authorization_code', code: 'pmoauth_ac_bad', client_id: 'c1', redirect_uri: 'https://a.com', code_verifier: VERIFIER },
