@@ -1,5 +1,6 @@
 import type { PayloadHandler, PayloadRequest } from 'payload'
 import { consumeAuthCode } from '../lib/auth-codes.js'
+import { validateCodeVerifier } from '../lib/pkce.js'
 import { issueTokenPair, rotateRefreshToken } from '../lib/tokens.js'
 import { oauthErrorResponse, jsonResponse, parseBody } from './helpers.js'
 
@@ -41,6 +42,10 @@ async function handleAuthCode(req: PayloadRequest, body: Record<string, unknown>
 
   if (!code || !clientId || !redirectUri || !codeVerifier) {
     return oauthErrorResponse(400, 'invalid_request', 'code, client_id, redirect_uri, and code_verifier are required')
+  }
+
+  if (!validateCodeVerifier(codeVerifier)) {
+    return oauthErrorResponse(400, 'invalid_request', 'code_verifier does not conform to RFC 7636 (43-128 unreserved chars)')
   }
 
   const ctx = await consumeAuthCode(req.payload, code, { clientId, redirectUri, codeVerifier })

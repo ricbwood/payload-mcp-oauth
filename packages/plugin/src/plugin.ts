@@ -157,14 +157,11 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
   // Helper to apply rate limiting inside a handler
   function withRateLimit(
     limiter: ReturnType<typeof createRateLimitStore>[keyof ReturnType<typeof createRateLimitStore>],
-    clientIdField: string | null,
     handler: (req: PayloadRequest) => Promise<Response> | Response,
   ) {
     return async (req: PayloadRequest): Promise<Response> => {
       const ip = (req.headers.get?.('x-forwarded-for') ?? '').split(',')[0]?.trim()
-      const body = req.method === 'POST' ? (req.data as Record<string, unknown> | undefined) : undefined
-      const clientId = clientIdField && body ? (body[clientIdField] as string | undefined) : undefined
-      const key = rateLimitKey(ip, clientId)
+      const key = rateLimitKey(ip)
       const allowed = limiter.check(key)
       if (!allowed) {
         return Response.json(
@@ -193,13 +190,13 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     {
       path: '/oauth/register',
       method: 'post',
-      handler: withCors(withRateLimit(rateLimits.register, 'client_name', makeRegisterHandler())),
+      handler: withCors(withRateLimit(rateLimits.register, makeRegisterHandler())),
     },
     { path: '/oauth/register', method: 'options', handler: corsPreflightHandler },
     {
       path: '/oauth/authorize',
       method: 'get',
-      handler: withRateLimit(rateLimits.authorize, null, makeAuthorizeHandler('/admin', undefined, `${apiBase}/oauth/consent`)),
+      handler: withRateLimit(rateLimits.authorize, makeAuthorizeHandler('/admin', undefined, `${apiBase}/oauth/consent`)),
     },
     {
       path: '/oauth/consent',
@@ -209,13 +206,13 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     {
       path: '/oauth/token',
       method: 'post',
-      handler: withCors(withRateLimit(rateLimits.token, 'client_id', makeTokenHandler())),
+      handler: withCors(withRateLimit(rateLimits.token, makeTokenHandler())),
     },
     { path: '/oauth/token', method: 'options', handler: corsPreflightHandler },
     {
       path: '/oauth/revoke',
       method: 'post',
-      handler: withCors(withRateLimit(rateLimits.revoke, 'client_id', makeRevokeHandler())),
+      handler: withCors(withRateLimit(rateLimits.revoke, makeRevokeHandler())),
     },
     { path: '/oauth/revoke', method: 'options', handler: corsPreflightHandler },
   ]

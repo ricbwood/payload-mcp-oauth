@@ -43,10 +43,18 @@ export async function consumeAuthCode(
 ): Promise<AuthCodeContext | null> {
   const codeHash = hashToken(plaintext)
 
+  // Pre-filter: only fetch codes that are still valid (not consumed, not expired).
+  // This reduces the window for validation failures and improves DB efficiency.
   const { docs } = await payload.find({
     collection: 'oauth-auth-codes',
     overrideAccess: true,
-    where: { codeHash: { equals: codeHash } },
+    where: {
+      and: [
+        { codeHash: { equals: codeHash } },
+        { consumedAt: { equals: null } },
+        { expiresAt: { greater_than: new Date().toISOString() } },
+      ],
+    },
     limit: 1,
     pagination: false,
   })
@@ -54,26 +62,30 @@ export async function consumeAuthCode(
   const code = docs[0]
   if (!code) return null
 
-  // Reject if already consumed — concurrent requests will see this set
-  if (code['consumedAt']) return null
-
-  // Reject if expired
-  if (new Date(code['expiresAt'] as string) < new Date()) return null
-
-  // Reject if client or redirect_uri mismatch
+  // Validate request-supplied fields against the stored code
   if (code['clientId'] !== params.clientId) return null
   if (code['redirectUri'] !== params.redirectUri) return null
-
-  // Reject if PKCE verification fails
   if (!verifyPkce(params.codeVerifier, code['codeChallenge'] as string, 'S256')) return null
 
-  // Mark consumed — any subsequent request finding this code will see consumedAt set
-  await payload.update({
+  // Atomic conditional update: only marks consumed if consumedAt is still null.
+  // Two concurrent requests with the same code will both pass the find+validate
+  // above, but only one can win this UPDATE WHERE consumedAt IS NULL — the DB
+  // serialises the writes and the loser gets back an empty docs array.
+  const result = await payload.update({
     collection: 'oauth-auth-codes',
     overrideAccess: true,
-    id: code.id,
+    where: {
+      and: [
+        { codeHash: { equals: codeHash } },
+        { consumedAt: { equals: null } },
+      ],
+    },
     data: { consumedAt: new Date().toISOString() },
   })
+
+  // Cast: payload.update with `where` returns BulkOperationResult { docs, errors }
+  const consumed = (result as unknown as { docs: unknown[] }).docs
+  if (!consumed?.length) return null
 
   return {
     clientId: code['clientId'] as string,

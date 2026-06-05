@@ -12,7 +12,8 @@ function makePayload(overrides: Record<string, unknown> = {}) {
   return {
     create: vi.fn().mockResolvedValue({ id: 'code-doc-1' }),
     find: vi.fn().mockResolvedValue({ docs: [] }),
-    update: vi.fn().mockResolvedValue({ id: 'code-doc-1' }),
+    // Bulk update (where) returns BulkOperationResult { docs, errors }
+    update: vi.fn().mockResolvedValue({ docs: [{ id: 'code-doc-1' }] }),
     ...overrides,
   }
 }
@@ -81,7 +82,11 @@ describe('consumeAuthCode', () => {
     expect(result).not.toBeNull()
     expect(result?.clientId).toBe('client-1')
     expect(result?.userId).toBe('user-1')
+    // Atomic update called with where clause (not id)
     expect(payload.update).toHaveBeenCalledOnce()
+    const updateArg = payload.update.mock.calls[0]?.[0] as Record<string, unknown>
+    expect(updateArg).toHaveProperty('where')
+    expect(updateArg).not.toHaveProperty('id')
   })
 
   it('returns null for an unknown code', async () => {
@@ -89,21 +94,22 @@ describe('consumeAuthCode', () => {
     expect(await consumeAuthCode(payload as never, 'pmoauth_ac_unknown', baseParams)).toBeNull()
   })
 
-  it('returns null for an already-consumed code (double-spend)', async () => {
+  it('returns null when the code was already consumed (filtered out by query)', async () => {
+    // In production the WHERE clause filters out consumed codes before they reach in-code checks.
+    // The mock simulates that: find returns empty, so no update is attempted.
     const payload = makePayload({
-      find: vi.fn().mockResolvedValue({ docs: [makeCodeDoc({ consumedAt: new Date().toISOString() })] }),
+      find: vi.fn().mockResolvedValue({ docs: [] }),
     })
     expect(await consumeAuthCode(payload as never, 'pmoauth_ac_used', baseParams)).toBeNull()
     expect(payload.update).not.toHaveBeenCalled()
   })
 
-  it('returns null for an expired code', async () => {
+  it('returns null for an expired code (filtered out by query)', async () => {
     const payload = makePayload({
-      find: vi.fn().mockResolvedValue({
-        docs: [makeCodeDoc({ expiresAt: new Date(Date.now() - 1000).toISOString() })],
-      }),
+      find: vi.fn().mockResolvedValue({ docs: [] }),
     })
     expect(await consumeAuthCode(payload as never, 'pmoauth_ac_expired', baseParams)).toBeNull()
+    expect(payload.update).not.toHaveBeenCalled()
   })
 
   it('returns null when clientId does not match', async () => {
@@ -111,6 +117,7 @@ describe('consumeAuthCode', () => {
       find: vi.fn().mockResolvedValue({ docs: [makeCodeDoc({ clientId: 'other-client' })] }),
     })
     expect(await consumeAuthCode(payload as never, 'pmoauth_ac_t', baseParams)).toBeNull()
+    expect(payload.update).not.toHaveBeenCalled()
   })
 
   it('returns null when redirectUri does not match', async () => {
@@ -120,6 +127,7 @@ describe('consumeAuthCode', () => {
       }),
     })
     expect(await consumeAuthCode(payload as never, 'pmoauth_ac_t', baseParams)).toBeNull()
+    expect(payload.update).not.toHaveBeenCalled()
   })
 
   it('returns null when PKCE verifier is wrong', async () => {
@@ -128,5 +136,16 @@ describe('consumeAuthCode', () => {
     })
     const badParams = { ...baseParams, codeVerifier: 'wrong-verifier' }
     expect(await consumeAuthCode(payload as never, 'pmoauth_ac_t', badParams)).toBeNull()
+    expect(payload.update).not.toHaveBeenCalled()
+  })
+
+  it('returns null when atomic update loses the race (concurrent double-spend)', async () => {
+    // Both requests found the code valid, but the atomic WHERE-update returns 0 rows
+    // because the other request already set consumedAt.
+    const payload = makePayload({
+      find: vi.fn().mockResolvedValue({ docs: [makeCodeDoc()] }),
+      update: vi.fn().mockResolvedValue({ docs: [] }),
+    })
+    expect(await consumeAuthCode(payload as never, 'pmoauth_ac_race', baseParams)).toBeNull()
   })
 })

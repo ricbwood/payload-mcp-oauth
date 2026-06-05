@@ -70,8 +70,13 @@ export function createRateLimitStore(overrides: RateLimitOptions = {}): RateLimi
   }
 }
 
-export function rateLimitKey(ip: string | undefined, clientId?: string): string {
-  return clientId ? `cid:${clientId}` : `ip:${ip ?? 'unknown'}`
+export function rateLimitKey(ip: string | undefined): string {
+  // Key on IP ALONE. Mixing in a client-supplied identifier (client_id /
+  // client_name) would give each distinct value its own bucket, so an attacker
+  // could rotate that field to mint a fresh quota on every request from the same
+  // IP — defeating the per-IP limit entirely. The IP is the one identifier the
+  // caller cannot trivially rotate, so it is the correct (and only) key here.
+  return `ip:${ip ?? 'unknown'}`
 }
 
 export function applyRateLimit(

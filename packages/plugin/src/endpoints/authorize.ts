@@ -1,5 +1,6 @@
 import type { PayloadHandler } from 'payload'
 import { makeCsrfToken } from '../lib/csrf.js'
+import { validateCodeChallenge } from '../lib/pkce.js'
 import { oauthErrorResponse, redirectResponse } from './helpers.js'
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -130,6 +131,10 @@ export function makeAuthorizeHandler(
 
     if (codeChallengeMethod !== 'S256') {
       return errorRedirect(redirectUri, 'invalid_request', 'code_challenge_method must be S256', state)
+    }
+
+    if (!validateCodeChallenge(codeChallenge)) {
+      return errorRedirect(redirectUri, 'invalid_request', 'code_challenge must be 43 base64url characters (RFC 7636 S256)', state)
     }
 
     // state is RECOMMENDED but optional per OAuth 2.1 — do not reject absent state

@@ -7,7 +7,8 @@ function makePayload(overrides: Record<string, unknown> = {}) {
   return {
     create: vi.fn().mockResolvedValue({ id: 'token-doc-1' }),
     find: vi.fn().mockResolvedValue({ docs: [] }),
-    update: vi.fn().mockResolvedValue({ id: 'token-doc-1' }),
+    // Bulk update (where) returns BulkOperationResult { docs, errors }
+    update: vi.fn().mockResolvedValue({ docs: [{ id: 'token-doc-1' }] }),
     ...overrides,
   }
 }
@@ -67,7 +68,7 @@ describe('rotateRefreshToken', () => {
     revokedAt: null,
   }
 
-  it('returns a new token pair and revokes the old refresh token', async () => {
+  it('returns a new token pair and atomically revokes the old refresh token', async () => {
     const payload = makePayload({
       find: vi.fn().mockResolvedValue({ docs: [activeToken] }),
     })
@@ -76,10 +77,11 @@ describe('rotateRefreshToken', () => {
     expect(pair).not.toBeNull()
     expect(pair?.access_token).toMatch(/^pmoauth_at_/)
     expect(pair?.refresh_token).toMatch(/^pmoauth_rt_/)
-    // Old token should be revoked
+    // Atomic revocation uses where clause, not id
     expect(payload.update).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'refresh-doc-1', data: expect.objectContaining({ revokedAt: expect.any(String) }) }),
+      expect.objectContaining({ where: expect.any(Object), data: expect.objectContaining({ revokedAt: expect.any(String) }) }),
     )
+    expect(payload.update.mock.calls[0]?.[0]).not.toHaveProperty('id')
   })
 
   it('returns null for an unknown refresh token', async () => {
@@ -101,11 +103,23 @@ describe('rotateRefreshToken', () => {
         .fn()
         .mockResolvedValueOnce({ docs: [consumed] })
         .mockResolvedValueOnce({ docs: [{ id: 'at-1' }, { id: 'at-2' }] }),
+      // revokeAllForClientUser uses update-by-id (not bulk update), so the mock returns a plain doc
+      update: vi.fn().mockResolvedValue({ id: 'some-token' }),
     })
 
     const result = await rotateRefreshToken(payload as never, 'pmoauth_rt_reused', { clientId: 'c1' })
     expect(result).toBeNull()
     // Both active tokens should be revoked
     expect(payload.update).toHaveBeenCalledTimes(2)
+  })
+
+  it('returns null when atomic revocation loses the race (concurrent rotation)', async () => {
+    // Both requests found the token valid, but the atomic WHERE-update returns 0 rows
+    // because the other request already set revokedAt.
+    const payload = makePayload({
+      find: vi.fn().mockResolvedValue({ docs: [activeToken] }),
+      update: vi.fn().mockResolvedValue({ docs: [] }),
+    })
+    expect(await rotateRefreshToken(payload as never, 'pmoauth_rt_race', { clientId: 'client-1' })).toBeNull()
   })
 })

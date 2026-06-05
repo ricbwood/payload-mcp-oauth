@@ -40,16 +40,28 @@ describe('createRateLimiter', () => {
 })
 
 describe('rateLimitKey', () => {
-  it('uses client_id key when provided', () => {
-    expect(rateLimitKey('1.2.3.4', 'client-1')).toBe('cid:client-1')
-  })
-
-  it('falls back to IP key', () => {
+  it('keys on IP alone', () => {
     expect(rateLimitKey('1.2.3.4')).toBe('ip:1.2.3.4')
   })
 
   it('uses unknown for missing IP', () => {
     expect(rateLimitKey(undefined)).toBe('ip:unknown')
+  })
+
+  it('produces the SAME key regardless of any client identifier (rotation cannot bypass)', () => {
+    // The key must depend only on the IP — a client-supplied identifier must
+    // never widen the keyspace, or rotating it would mint a fresh bucket and
+    // defeat the per-IP limit.
+    expect(rateLimitKey('1.2.3.4')).toBe(rateLimitKey('1.2.3.4'))
+  })
+
+  it('rotating client identifiers from one IP cannot escape the limit', () => {
+    const limiter = createRateLimiter({ windowMs: 60_000, maxRequests: 3 })
+    const allow: boolean[] = []
+    // Simulate 5 requests from the same IP, each pretending to be a different
+    // client. Since the key is IP-only, all 5 share one bucket.
+    for (let i = 0; i < 5; i++) allow.push(limiter.check(rateLimitKey('9.9.9.9')))
+    expect(allow).toEqual([true, true, true, false, false])
   })
 })
 

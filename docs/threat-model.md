@@ -1,7 +1,7 @@
 # Threat Model: `@brainwebuk/payload-plugin-mcp-oauth`
 
 **Method:** STRIDE  
-**Date:** 2026-05-29  
+**Date:** 2026-06-04  
 **References:** ADR-0001 through ADR-0005, OWASP OAuth cheat sheet, OAuth 2.1 BCP
 
 ---
@@ -62,7 +62,7 @@ Trust boundaries crossed on each request:
 | S2 | Attacker replays a captured access token before expiry | Access tokens have a 60-minute TTL. Revocation via `POST /api/oauth/revoke` takes effect immediately. Short TTL limits the replay window. | T2.3, T4.7 |
 | S3 | Attacker replays a captured refresh token | Refresh tokens are single-use with rotation. A consumed token triggers family revocation on next use. | T3.4 |
 | S4 | Attacker spoofs a registered client (misuses another client's `client_id`) | Client has no secret, but PKCE verifier must match the challenge stored at authorize time. An attacker without the verifier cannot exchange the auth code. | T3.2, T4.4 |
-| S5 | Attacker intercepts an auth code in the redirect | State parameter is required and verified (see CSRF section). PKCE binds the code to the originating client. HTTPS required in production. | T4.4, T4.5 |
+| S5 | Attacker intercepts an auth code in the redirect | `state` is RECOMMENDED per OAuth 2.1 + PKCE (the primary CSRF defence is PKCE, not state). The server echoes state unchanged; the client verifies it. PKCE binds the code to the originating client. HTTPS required in production. | T4.4, T4.5 |
 
 ### 3.2 Tampering
 
@@ -70,7 +70,7 @@ Trust boundaries crossed on each request:
 |---|--------|------------|------|
 | T1 | Attacker tampers with `redirect_uri` in authorize request to redirect auth code to attacker-controlled URL | Exact-match validation of `redirect_uri` against registered URIs (ADR-0003 §6). Any mismatch returns `invalid_request`, no redirect issued. | T4.4 |
 | T2 | Attacker tampers with `scope` to elevate privileges | **Scope is not yet a privilege boundary.** The requested `scope` is informational only — it is shown on the consent screen and stored on the token, but tokens are granted the full set of capabilities enabled on the MCP server (`MCPPluginConfig`), independent of the requested scope. Tampering with `scope` therefore cannot grant *more* than the operator already enabled for all MCP clients. Per-scope capability narrowing is tracked as an enhancement (#35); until it lands, the consent screen states explicitly that approval grants all enabled tools. | T4.4 |
-| T3 | Attacker tampers with `state` parameter to break CSRF binding | `state` is opaque to the server but required and echoed back unchanged. The client verifies it on receipt. The server rejects missing `state`. | T4.4 |
+| T3 | Attacker tampers with `state` parameter to break CSRF binding | `state` is opaque to the server and RECOMMENDED but optional (per OAuth 2.1 §2.1.2; PKCE is the primary CSRF defence). The server echoes state unchanged; the client verifies it on receipt. Absent state is not rejected — clients relying on state alone for CSRF protection must send it. | T4.4 |
 | T4 | Database row tampering — attacker with DB access modifies token capabilities | All tokens store a HMAC-protected hash. Modifying a row does not create a valid token. However, direct DB write with a known pepper could. Mitigation: restrict DB access; pepper stored separately from DB. | T2.4, T8.3 |
 | T5 | Attacker modifies `code_challenge` after it is stored to accept their own verifier | `code_challenge` is written once on authorize and compared at token exchange. No update path exists. | T2.2 |
 
@@ -89,7 +89,7 @@ Trust boundaries crossed on each request:
 | I1 | Token plaintext leaked in logs | Logging utilities (T8.2) never log Bearer headers, token values, code values, or PKCE verifiers. Only hashed IDs appear in logs. | T8.2 |
 | I2 | Stack traces or DB internals returned in error responses | All error responses are RFC 6749-compliant JSON (`{"error": "...", "error_description": "..."}`) with no internal details. A global error handler catches unhandled exceptions. | T4.3–T4.7 |
 | I3 | Token hash exposed if DB is compromised | Hashes are HMAC-SHA-256 with a server-side pepper. Without the pepper, hashes are not redeemable. | T2.4, T8.3 |
-| I4 | Timing oracle on token lookup (reveals whether a token exists) | All lookup paths use `crypto.timingSafeEqual`. The not-found branch is padded to run in constant time relative to the found branch. | T2.4, T3.5 |
+| I4 | Timing oracle on token lookup (reveals whether a token exists) | `validateAccessToken` locates tokens via an indexed DB equality query on the HMAC hash — the DB lookup itself is not constant-time and the not-found branch does not pad to match the found-branch timing. The actual hash comparison uses `crypto.timingSafeEqual`. Real impact is negligible: the looked-up value is an unguessable 256-bit HMAC, so a timing side-channel reveals no actionable information to an attacker. | T2.4, T3.5 |
 | I5 | `client_id` enumeration via registration errors | Registration errors are returned as RFC 7591 errors without revealing whether a `client_id` already exists. | T4.3 |
 | I6 | Consent screen leaks OAuth parameters in Referrer header | `Referrer-Policy: strict-origin-when-cross-origin` on consent screen. Form action is same-origin. | T6.1, T8.1 |
 | I7 | Auth code exposed in browser history or server logs via GET request | Auth codes are delivered as query parameters on redirects (per RFC 6749 §4.1.2). To mitigate: the redirect uses 302 (not 301, avoiding caching), and auth code records are deleted after consumption. HTTPS in production prevents interception. **Accepted risk:** query-parameter delivery is the RFC-standard mechanism; fragment delivery is not universally supported by MCP clients. | Accepted |
@@ -100,7 +100,7 @@ Trust boundaries crossed on each request:
 |---|--------|------------|------|
 | D1 | Flood of registration requests filling `oauth-clients` collection | Per-IP rate limiting on `/register` (T4.8). Inactive/unused clients can be pruned by admin. | T4.8 |
 | D2 | Flood of authorize requests creating pending sessions | Per-IP rate limiting on `/authorize` (T4.8). Pending authorize sessions are short-lived (10 minutes). | T4.8 |
-| D3 | Flood of token requests | Per-IP and per-`client_id` rate limiting on `/token` (T4.8). | T4.8 |
+| D3 | Flood of token requests | Per-IP rate limiting on `/token` (T4.8). The rate-limit key is the client IP **alone** — a client-supplied identifier is never mixed in, because rotating it would mint a fresh bucket per request and defeat the per-IP limit. IP is taken from `x-forwarded-for` (see §6). | T4.8 |
 | D4 | Large-scale auth code creation exhausting DB | Auth codes expire in 60 seconds; a sweep hook purges expired records. Rate limiting bounds the creation rate. | T2.2, T4.8 |
 | D5 | Token validation becomes a bottleneck at high MCP RPS | HMAC-SHA-256 lookup is O(log n) on an indexed `token_hash` column. T7.8 benchmarks the path to confirm p95 < 25 ms. | T2.3, T7.8 |
 | D6 | Attacker triggers refresh-token family revocation to lock out legitimate user | If an attacker uses a stolen refresh token, family revocation runs — the legitimate user is also logged out. **Accepted risk:** this is the correct security outcome per OAuth 2.1 BCP §2.2.2. The user must re-authorize, which is a minor inconvenience compared to an active attacker using the session. | Accepted |
@@ -116,7 +116,7 @@ Trust boundaries crossed on each request:
 | E5 | IDOR — user reads or modifies another user's auth code records | The `oauth-auth-codes` collection has admin-only read access in the Payload admin. Code consumption validates `user_id` match. | T2.2, T4.6 |
 | E6 | Attacker registers a client with a malicious `client_name` for XSS on consent screen | `client_name` is HTML-escaped before rendering on the consent screen. Content-Security-Policy blocks inline scripts. | T4.3, T6.1 |
 | E7 | Open redirect via `redirect_uri` manipulation | Exact-match redirect URI validation (ADR-0003 §6). Any non-exact match is rejected with `invalid_request` before any redirect occurs. | T4.4 |
-| E8 | CSRF on consent form submission | `POST /api/oauth/consent` is **session-bound**: it requires an authenticated Payload session (`req.user`) and mints the auth code for the *session* user, never the body-supplied `user_id` (a mismatched `user_id` is rejected). The form's CSRF token is a **time-bound** HMAC over `(userId, clientId, redirectUri, codeChallenge, issuedAt)`, bound to the session user and rejected once older than 10 minutes — so it cannot be replayed cross-user or after expiry. Same-site cookie policy on the admin session further blocks cross-origin form submissions. PKCE binds the resulting code to the originating client. | T4.5 |
+| E8 | CSRF on consent form submission | `POST /api/oauth/consent` is **session-bound**: it requires an authenticated Payload session (`req.user`) and mints the auth code for the *session* user, never the body-supplied `user_id` (a mismatched `user_id` is rejected). The form's CSRF token is a **time-bound** HMAC over `(userId, clientId, redirectUri, codeChallenge, issuedAt)`, bound to the session user and rejected once older than 10 minutes. **Known limitation:** the token is not yet single-use; within the 10-minute TTL the same consent form could be submitted more than once, creating duplicate auth codes for the same user+client+challenge. Impact is low: same-site cookies block cross-origin submissions, PKCE binds codes to the originating client, and auth codes are themselves single-use. Tracked as enhancement #27. | T4.5 |
 | E9 | Auth code injection — attacker injects a valid code obtained from another flow | Auth codes are bound to `client_id`, `redirect_uri`, and PKCE challenge. All three must match at exchange time. | T4.6 |
 | E10 | Attacker calls admin-only collection endpoints directly via REST | `oauth-clients`, `oauth-auth-codes`, `oauth-tokens` collections use Payload access control set to admin-only. No public REST/GraphQL access to these collections. | T2.1–T2.3 |
 
@@ -141,9 +141,9 @@ These mitigations apply to the entire plugin, not a single threat:
 | Control | Description | Tasks |
 |---------|-------------|-------|
 | HTTPS required | Boot check refuses to start in production without `NEXT_PUBLIC_SERVER_URL` starting with `https://`. | T8.3 |
-| Security headers | CSP, HSTS, X-Frame-Options, Referrer-Policy on all OAuth responses. | T8.1 |
+| Security headers | `Cache-Control: no-store`, `Strict-Transport-Security`, and `X-Content-Type-Options` on all JSON OAuth responses (`jsonResponse`). Consent/authorize HTML also adds `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a strict CSP. | T8.1 |
 | No-store cache headers | `Cache-Control: no-store` on all token and auth code responses. | T8.1 |
-| Rate limiting | Per-IP and per-client_id limits on all public OAuth endpoints. | T4.8 |
+| Rate limiting | Per-IP limits on all public OAuth endpoints. The key is the client IP **alone** (`ip:<ip>`); a client-supplied identifier (`client_id` / `client_name`) is deliberately never part of the key, since rotating it would mint a fresh bucket and bypass the per-IP limit. IP is taken from `x-forwarded-for`; operators behind a reverse proxy should ensure only one trusted proxy sets this header. | T4.8 |
 | Audit logging | Structured log entries for all significant auth events, with no secret material. | T8.2 |
 | Semgrep + CodeQL | Automated SAST in CI catches common injection and logic vulnerabilities. | T0.5 |
 | gitleaks | Secret scanning in CI prevents accidental key commits. | T0.5 |
