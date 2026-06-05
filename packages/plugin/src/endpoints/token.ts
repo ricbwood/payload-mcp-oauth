@@ -1,10 +1,12 @@
 import type { PayloadHandler, PayloadRequest } from 'payload'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import { consumeAuthCode } from '../lib/auth-codes.js'
 import { validateCodeVerifier } from '../lib/pkce.js'
 import { issueTokenPair, rotateRefreshToken } from '../lib/tokens.js'
+import { scopeToCapabilities } from '../lib/scope.js'
 import { oauthErrorResponse, jsonResponse, parseBody } from './helpers.js'
 
-export function makeTokenHandler(): PayloadHandler {
+export function makeTokenHandler(mcpPluginOptions?: MCPPluginConfig): PayloadHandler {
   return async (req) => {
     try {
       if (req.method !== 'POST') {
@@ -19,7 +21,7 @@ export function makeTokenHandler(): PayloadHandler {
       }
 
       if (grantType === 'authorization_code') {
-        return await handleAuthCode(req, body)
+        return await handleAuthCode(req, body, mcpPluginOptions)
       }
 
       if (grantType === 'refresh_token') {
@@ -34,7 +36,7 @@ export function makeTokenHandler(): PayloadHandler {
   }
 }
 
-async function handleAuthCode(req: PayloadRequest, body: Record<string, unknown>): Promise<Response> {
+async function handleAuthCode(req: PayloadRequest, body: Record<string, unknown>, mcpPluginOptions?: MCPPluginConfig): Promise<Response> {
   const code = body['code'] as string | undefined
   const clientId = body['client_id'] as string | undefined
   const redirectUri = body['redirect_uri'] as string | undefined
@@ -53,11 +55,31 @@ async function handleAuthCode(req: PayloadRequest, body: Record<string, unknown>
     return oauthErrorResponse(400, 'invalid_grant', 'Authorization code is invalid, expired, or already used')
   }
 
+  // Resolve the granted capabilities from the requested scope. The `valid` flag
+  // MUST be honoured: scopeToCapabilities returns capabilities:{} for BOTH an
+  // empty scope (intentional full grant, applied by the wrap-mcp fallback) AND
+  // an invalid scope (grant nothing). Storing {} for the invalid case would let
+  // wrap-mcp widen it back to FULL capabilities — a privilege escalation that
+  // defeats narrowing (e.g. the operator disabled a collection after the auth
+  // code was issued). So an invalid scope is rejected here, never issued.
+  let capabilities: Record<string, unknown> = {}
+  if (mcpPluginOptions) {
+    const scopeResult = scopeToCapabilities(ctx.scope ?? '', mcpPluginOptions)
+    if (!scopeResult.valid) {
+      return oauthErrorResponse(
+        400,
+        'invalid_scope',
+        `Requested scope can no longer be granted: ${scopeResult.invalidScopes.join(' ')}`,
+      )
+    }
+    capabilities = scopeResult.capabilities
+  }
+
   const pair = await issueTokenPair(req.payload, {
     clientId: ctx.clientId,
     userId: ctx.userId,
     scope: ctx.scope,
-    capabilities: {},
+    capabilities,
   })
 
   return jsonResponse(pair)

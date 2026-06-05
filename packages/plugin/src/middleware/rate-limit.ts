@@ -76,7 +76,14 @@ export function rateLimitKey(ip: string | undefined): string {
   // could rotate that field to mint a fresh quota on every request from the same
   // IP — defeating the per-IP limit entirely. The IP is the one identifier the
   // caller cannot trivially rotate, so it is the correct (and only) key here.
-  return `ip:${ip ?? 'unknown'}`
+  //
+  // Coalesce missing/empty/whitespace IPs to a sentinel: `${'' ?? 'unknown'}`
+  // is '' (nullish coalescing does not catch empty strings), which would yield
+  // the malformed key `ip:`. Requests with no resolvable IP then share one
+  // bucket — unavoidable since they can't be told apart; deployments should sit
+  // behind a proxy that always sets x-forwarded-for.
+  const id = ip?.trim()
+  return `ip:${id || 'unknown'}`
 }
 
 export function applyRateLimit(

@@ -1,9 +1,11 @@
 import type { PayloadHandler } from 'payload'
-import { verifyCsrfToken } from '../lib/csrf.js'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
+import { verifyCsrfToken, consumeCsrfNonce } from '../lib/csrf.js'
 import { issueAuthCode } from '../lib/auth-codes.js'
+import { scopeToCapabilities } from '../lib/scope.js'
 import { oauthErrorResponse, redirectResponse, parseBody } from './helpers.js'
 
-export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): PayloadHandler {
+export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = '', mcpPluginOptions?: MCPPluginConfig): PayloadHandler {
   return async (req) => {
     try {
       if (req.method !== 'POST') {
@@ -32,10 +34,11 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
       // spuriously 403 a legitimate request (123 !== "123").
       const bodyUserId = body['user_id'] != null ? String(body['user_id']) : undefined
       const csrfToken = body['csrf_token'] as string | undefined
+      const csrfNonce = body['csrf_nonce'] as string | undefined
       const scope = (body['scope'] as string | undefined) ?? ''
       const resource = (body['resource'] as string | undefined) ?? ''
 
-      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !csrfToken) {
+      if (!clientId || !redirectUri || !codeChallenge || !codeChallengeMethod || !csrfToken || !csrfNonce) {
         return oauthErrorResponse(400, 'invalid_request', 'Missing required consent parameters')
       }
 
@@ -49,6 +52,20 @@ export function makeConsentHandler(authCodeTtlSeconds = 300, issuer = ''): Paylo
       // different user (or a replay past its TTL) will not validate.
       if (!verifyCsrfToken(csrfToken, sessionUserId, clientId, redirectUri, codeChallenge)) {
         return oauthErrorResponse(400, 'invalid_request', 'Invalid or expired CSRF token')
+      }
+
+      // Single-use nonce: atomically marks the nonce consumed so the same consent
+      // form cannot be submitted twice (prevents duplicate auth code issuance).
+      if (!(await consumeCsrfNonce(req.payload, csrfNonce, sessionUserId))) {
+        return oauthErrorResponse(400, 'invalid_request', 'CSRF nonce already used or expired')
+      }
+
+      // Re-validate scope at consent time to prevent tampering with the hidden scope field
+      if (scope && mcpPluginOptions) {
+        const scopeResult = scopeToCapabilities(scope, mcpPluginOptions)
+        if (!scopeResult.valid) {
+          return oauthErrorResponse(400, 'invalid_scope', `Unknown or unsupported scope: ${scopeResult.invalidScopes.join(' ')}`)
+        }
       }
 
       if (decision === 'deny') {

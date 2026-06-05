@@ -2,6 +2,7 @@ import type { Config, Endpoint, PayloadRequest } from 'payload'
 import type { PayloadMcpOAuthConfig, ResolvedConfig } from './types.js'
 import { oauthAuthCodesCollection } from './collections/auth-codes.js'
 import { oauthClientsCollection } from './collections/clients.js'
+import { oauthCsrfNoncesCollection } from './collections/csrf-nonces.js'
 import { oauthTokensCollection } from './collections/tokens.js'
 import { makeAuthorizeHandler } from './endpoints/authorize.js'
 import { makeConsentHandler } from './endpoints/consent.js'
@@ -196,17 +197,17 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     {
       path: '/oauth/authorize',
       method: 'get',
-      handler: withRateLimit(rateLimits.authorize, makeAuthorizeHandler('/admin', undefined, `${apiBase}/oauth/consent`)),
+      handler: withRateLimit(rateLimits.authorize, makeAuthorizeHandler('/admin', undefined, `${apiBase}/oauth/consent`, resolved.mcpPluginOptions)),
     },
     {
       path: '/oauth/consent',
       method: 'post',
-      handler: makeConsentHandler(resolved.authCodeTtlSeconds, resolved.issuer),
+      handler: makeConsentHandler(resolved.authCodeTtlSeconds, resolved.issuer, resolved.mcpPluginOptions),
     },
     {
       path: '/oauth/token',
       method: 'post',
-      handler: withCors(withRateLimit(rateLimits.token, makeTokenHandler())),
+      handler: withCors(withRateLimit(rateLimits.token, makeTokenHandler(resolved.mcpPluginOptions))),
     },
     { path: '/oauth/token', method: 'options', handler: corsPreflightHandler },
     {
@@ -244,6 +245,7 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
       oauthClientsCollection,
       oauthAuthCodesCollection,
       oauthTokensCollection,
+      oauthCsrfNoncesCollection,
     ],
     endpoints: [...(incomingConfig.endpoints ?? []), ...oauthEndpoints],
     admin: {

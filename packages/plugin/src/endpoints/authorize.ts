@@ -1,6 +1,8 @@
 import type { PayloadHandler } from 'payload'
-import { makeCsrfToken } from '../lib/csrf.js'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
+import { makeCsrfToken, storeCsrfNonce } from '../lib/csrf.js'
 import { validateCodeChallenge } from '../lib/pkce.js'
+import { scopeToCapabilities } from '../lib/scope.js'
 import { oauthErrorResponse, redirectResponse } from './helpers.js'
 
 const SCOPE_LABELS: Record<string, string> = {
@@ -30,12 +32,18 @@ function buildConsentHtml(p: {
   userId: string
   resource: string
   csrfToken: string
+  csrfNonce: string
   consentPath: string
+  scopeEnforced: boolean
 }): string {
-  const labels = p.scope.trim()
+  const hasScope = p.scope.trim().length > 0
+  const labels = hasScope
     ? p.scope.split(/\s+/).filter(Boolean).map((s) => SCOPE_LABELS[s] ?? s)
-    : ['Access your Payload CMS instance']
+    : ['All tools enabled on this server']
   const items = labels.map((l) => `<li>${e(l)}</li>`).join('')
+  const note = hasScope && p.scopeEnforced
+    ? 'Only the capabilities listed above will be granted, on your behalf. Only approve applications you trust.'
+    : 'Approving grants the application access to <strong>all tools enabled on this server</strong>, on your behalf. Only approve applications you trust.'
   return `<!DOCTYPE html><html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -52,9 +60,9 @@ h1{font-size:1.25rem;margin-bottom:0.5rem}
 </style>
 </head><body>
 <h1>Authorize <strong>${e(p.clientName)}</strong></h1>
-<p>Approving will let <strong>${e(p.clientName)}</strong> access your Payload CMS instance <strong>acting as you</strong>. It requested:</p>
+<p>Approving will let <strong>${e(p.clientName)}</strong> access your Payload CMS instance <strong>acting as you</strong>. It will be granted:</p>
 <ul class="scope-list">${items}</ul>
-<p class="note">The items above are what the application asked for. This MCP server does not yet restrict access per&#8209;permission &mdash; approving grants the application <strong>all tools enabled on this server</strong>, on your behalf. Only approve applications you trust.</p>
+<p class="note">${note}</p>
 <form method="POST" action="${e(p.consentPath)}">
 <input type="hidden" name="client_id" value="${e(p.clientId)}">
 <input type="hidden" name="redirect_uri" value="${e(p.redirectUri)}">
@@ -65,6 +73,7 @@ h1{font-size:1.25rem;margin-bottom:0.5rem}
 <input type="hidden" name="scope" value="${e(p.scope)}">
 <input type="hidden" name="resource" value="${e(p.resource)}">
 <input type="hidden" name="csrf_token" value="${e(p.csrfToken)}">
+<input type="hidden" name="csrf_nonce" value="${e(p.csrfNonce)}">
 <div class="actions">
 <button type="submit" name="decision" value="approve" class="btn btn-approve">Approve</button>
 <button type="submit" name="decision" value="deny" class="btn btn-deny">Deny</button>
@@ -88,6 +97,7 @@ export function makeAuthorizeHandler(
   adminPath = '/admin',
   loginPath?: string,
   consentPath = '/api/oauth/consent',
+  mcpPluginOptions?: MCPPluginConfig,
 ): PayloadHandler {
   return async (req) => {
     const q = req.query as Record<string, string | undefined>
@@ -137,6 +147,14 @@ export function makeAuthorizeHandler(
       return errorRedirect(redirectUri, 'invalid_request', 'code_challenge must be 43 base64url characters (RFC 7636 S256)', state)
     }
 
+    // Validate scope against operator-enabled capabilities (RFC 6749 §4.1.2.1)
+    if (scope && mcpPluginOptions) {
+      const scopeResult = scopeToCapabilities(scope, mcpPluginOptions)
+      if (!scopeResult.valid) {
+        return errorRedirect(redirectUri, 'invalid_scope', `Unknown or unsupported scope: ${scopeResult.invalidScopes.join(' ')}`, state)
+      }
+    }
+
     // state is RECOMMENDED but optional per OAuth 2.1 — do not reject absent state
     const user = req.user
     if (!user) {
@@ -156,8 +174,9 @@ export function makeAuthorizeHandler(
     const clientName = String(client['clientName'] ?? clientId)
     const userId = String((user as Record<string, unknown>)['id'] ?? '')
     const csrfToken = makeCsrfToken(userId, clientId, redirectUri, codeChallenge)
+    const csrfNonce = await storeCsrfNonce(req.payload, userId)
 
-    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId, resource, csrfToken, consentPath }), {
+    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId, resource, csrfToken, csrfNonce, consentPath, scopeEnforced: !!mcpPluginOptions }), {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',

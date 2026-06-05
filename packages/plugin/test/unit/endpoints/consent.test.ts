@@ -1,8 +1,13 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import { makeConsentHandler } from '../../../src/endpoints/consent.js'
 import { makeCsrfToken } from '../../../src/lib/csrf.js'
 
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
+
+const MCP_OPTIONS: MCPPluginConfig = {
+  collections: { posts: { enabled: true } },
+}
 
 const REGISTERED_URI = 'https://example.com/cb'
 const CODE_CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
@@ -24,6 +29,7 @@ const VALID_BODY = {
   user_id: 'user-1',
   scope: 'posts:read',
   csrf_token: makeCsrfToken('user-1', 'client-1', REGISTERED_URI, CODE_CHALLENGE),
+  csrf_nonce: 'aabbccddeeff00112233445566778899',
 }
 
 function makeReq(body: unknown, method = 'POST', user: unknown = { id: 'user-1' }) {
@@ -36,6 +42,7 @@ function makeReq(body: unknown, method = 'POST', user: unknown = { id: 'user-1' 
     payload: {
       find: vi.fn().mockResolvedValue({ docs: [VALID_CLIENT] }),
       create: vi.fn().mockResolvedValue({ id: 'code-doc-1' }),
+      update: vi.fn().mockResolvedValue({ docs: [{ id: 'nonce-doc-1' }] }),
     },
   }
 }
@@ -95,6 +102,21 @@ describe('makeConsentHandler', () => {
     const location = res.headers.get('Location') ?? ''
     expect(location).toContain('code=pmoauth_ac_')
     expect(location).not.toContain('state=')
+  })
+
+  it('rejects a replayed csrf_nonce with 400 (single-use enforcement)', async () => {
+    const req = makeReq(VALID_BODY)
+    req.payload.update = vi.fn().mockResolvedValue({ docs: [] })
+    const res = await makeConsentHandler()(req as never)
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_request')
+    expect(req.payload.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects missing csrf_nonce with 400', async () => {
+    const { csrf_nonce: _omit, ...bodyWithoutNonce } = VALID_BODY
+    const res = await makeConsentHandler()(makeReq(bodyWithoutNonce) as never)
+    expect(res.status).toBe(400)
   })
 
   it('rejects missing csrf_token with 400', async () => {
@@ -183,5 +205,20 @@ describe('makeConsentHandler', () => {
     const res = await makeConsentHandler()(req as never)
     expect(res.status).toBe(400)
     expect(req.payload.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects a tampered scope token with 400 when scope enforcement is active', async () => {
+    const req = makeReq({ ...VALID_BODY, scope: 'evil:all' }, 'POST', { id: 'user-1' })
+    const res = await makeConsentHandler(300, '', MCP_OPTIONS)(req as never)
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_scope')
+    expect(req.payload.create).not.toHaveBeenCalled()
+  })
+
+  it('allows a valid scope token when scope enforcement is active', async () => {
+    const req = makeReq({ ...VALID_BODY, scope: 'posts:read' })
+    const res = await makeConsentHandler(300, '', MCP_OPTIONS)(req as never)
+    expect(res.status).toBe(302)
+    expect(req.payload.create).toHaveBeenCalled()
   })
 })

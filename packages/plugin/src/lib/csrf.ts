@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import type { Payload } from 'payload'
 import { hashToken } from './token-storage.js'
 
 // CSRF tokens are time-bound. The wire format is "<issuedAtMs>.<hmacHex>" where
@@ -29,6 +30,50 @@ export function makeCsrfToken(
   issuedAt: number = Date.now(),
 ): string {
   return `${issuedAt}.${sign(userId, clientId, redirectUri, codeChallenge, issuedAt)}`
+}
+
+export function generateCsrfNonce(): string {
+  return crypto.randomBytes(16).toString('hex')
+}
+
+export async function storeCsrfNonce(
+  payload: Payload,
+  userId: string,
+  ttlMs: number = DEFAULT_MAX_AGE_MS,
+): Promise<string> {
+  const nonce = generateCsrfNonce()
+  await payload.create({
+    collection: 'oauth-csrf-nonces',
+    overrideAccess: true,
+    data: {
+      nonceHash: hashToken(nonce),
+      userId,
+      expiresAt: new Date(Date.now() + ttlMs).toISOString(),
+    },
+  })
+  return nonce
+}
+
+export async function consumeCsrfNonce(
+  payload: Payload,
+  nonce: string,
+  userId: string,
+): Promise<boolean> {
+  if (typeof nonce !== 'string' || nonce.length > 64) return false
+  const result = await payload.update({
+    collection: 'oauth-csrf-nonces',
+    overrideAccess: true,
+    where: {
+      and: [
+        { nonceHash: { equals: hashToken(nonce) } },
+        { userId: { equals: userId } },
+        { consumedAt: { equals: null } },
+        { expiresAt: { greater_than: new Date().toISOString() } },
+      ],
+    },
+    data: { consumedAt: new Date().toISOString() },
+  })
+  return ((result as unknown as { docs: unknown[] }).docs?.length ?? 0) > 0
 }
 
 export function verifyCsrfToken(

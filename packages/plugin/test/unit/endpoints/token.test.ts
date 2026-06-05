@@ -1,9 +1,14 @@
 import crypto from 'crypto'
 import { describe, expect, it, vi } from 'vitest'
+import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import { makeTokenHandler } from '../../../src/endpoints/token.js'
 import { hashToken } from '../../../src/lib/token-storage.js'
 
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
+
+const MCP_OPTIONS: MCPPluginConfig = {
+  collections: { posts: { enabled: true } },
+}
 
 // RFC 7636 §Appendix B test vector (43 chars of the unreserved set)
 const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
@@ -67,6 +72,57 @@ describe('makeTokenHandler — authorization_code grant', () => {
     const b = await res.json() as Record<string, unknown>
     expect(b['access_token']).toMatch(/^pmoauth_at_/)
     expect(b['refresh_token']).toMatch(/^pmoauth_rt_/)
+  })
+
+  it('stores narrowed capabilities derived from the auth code scope (scope enforcement)', async () => {
+    const authCode = 'pmoauth_ac_' + crypto.randomBytes(32).toString('base64url')
+    const req = makeReq(
+      { grant_type: 'authorization_code', code: authCode, client_id: 'client-1', redirect_uri: 'https://example.com/cb', code_verifier: VERIFIER },
+      [makeCodeDoc({ scope: 'posts:read' })],
+    )
+    await makeTokenHandler(MCP_OPTIONS)(req as never)
+    // issueTokenPair is called via payload.create — verify the narrowed capabilities were passed
+    const createCall = req.payload.create.mock.calls.find(
+      (c: [{ collection: string }]) => c[0].collection === 'oauth-tokens',
+    )
+    expect(createCall).toBeDefined()
+    const data = (createCall as [{ data: Record<string, unknown> }])[0].data
+    expect(data['capabilities']).toEqual({ posts: { find: true } })
+  })
+
+  it('stores empty capabilities (full-grant fallback) when scope is absent', async () => {
+    const authCode = 'pmoauth_ac_' + crypto.randomBytes(32).toString('base64url')
+    const req = makeReq(
+      { grant_type: 'authorization_code', code: authCode, client_id: 'client-1', redirect_uri: 'https://example.com/cb', code_verifier: VERIFIER },
+      [makeCodeDoc({ scope: '' })],
+    )
+    await makeTokenHandler(MCP_OPTIONS)(req as never)
+    const createCall = req.payload.create.mock.calls.find(
+      (c: [{ collection: string }]) => c[0].collection === 'oauth-tokens',
+    )
+    const data = (createCall as [{ data: Record<string, unknown> }])[0].data
+    // Empty scope → capabilities={} so wrap-mcp uses buildFullCapabilities fallback
+    expect(data['capabilities']).toEqual({})
+  })
+
+  it('rejects with invalid_scope when the code scope is no longer grantable (no full-grant escalation)', async () => {
+    // Scope was valid at /authorize but the collection is now disabled (here
+    // 'secrets' is absent from MCP_OPTIONS). scopeToCapabilities → valid:false,
+    // capabilities:{}. Storing {} would let wrap-mcp widen it to FULL caps, so
+    // the exchange must be rejected rather than issue an (escalated) token.
+    const authCode = 'pmoauth_ac_' + crypto.randomBytes(32).toString('base64url')
+    const req = makeReq(
+      { grant_type: 'authorization_code', code: authCode, client_id: 'client-1', redirect_uri: 'https://example.com/cb', code_verifier: VERIFIER },
+      [makeCodeDoc({ scope: 'secrets:read' })],
+    )
+    const res = await makeTokenHandler(MCP_OPTIONS)(req as never)
+    expect(res.status).toBe(400)
+    expect(((await res.json()) as Record<string, unknown>)['error']).toBe('invalid_scope')
+    // No token row was created.
+    const createdToken = req.payload.create.mock.calls.find(
+      (c: [{ collection: string }]) => c[0].collection === 'oauth-tokens',
+    )
+    expect(createdToken).toBeUndefined()
   })
 
   it('returns invalid_grant for bad code', async () => {
