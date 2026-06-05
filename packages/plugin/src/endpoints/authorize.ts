@@ -183,7 +183,13 @@ export function makeAuthorizeHandler(
         'Cache-Control': 'no-store',
         'X-Frame-Options': 'DENY',
         'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'no-referrer',
+        // MUST NOT be 'no-referrer': per the Fetch spec, a 'no-referrer' page sends
+        // `Origin: null` on its form submissions, and Payload rejects cookie auth on
+        // a null-origin POST — so the Approve submit loses req.user and the consent
+        // endpoint 401s. 'strict-origin-when-cross-origin' (the documented value in
+        // the threat model, row I6) keeps the real Origin on this same-origin POST
+        // while still stripping the full URL from the cross-origin client callback.
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
         // form-action omitted intentionally: Chrome blocks form-POST redirects to
         // origins not in form-action, and the consent redirect goes to the client's
         // localhost callback (random port). default-src 'none' already blocks XSS,
