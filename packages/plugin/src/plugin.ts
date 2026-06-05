@@ -1,4 +1,4 @@
-import type { Config, Endpoint, PayloadRequest } from 'payload'
+import type { Access, Config, Endpoint, PayloadRequest } from 'payload'
 import type { PayloadMcpOAuthConfig, ResolvedConfig } from './types.js'
 import { oauthAuthCodesCollection } from './collections/auth-codes.js'
 import { oauthClientsCollection } from './collections/clients.js'
@@ -79,10 +79,19 @@ function resolveConfig(options: PayloadMcpOAuthConfig): ResolvedConfig {
     )
   }
 
+  const userCollection = options.userCollection ?? 'users'
+  // Default admin gate: an authenticated user in the configured admin collection.
+  // Closes the public REST/GraphQL surface while letting admin-panel operators
+  // see and manage the collections. Apps with mixed-role user collections should
+  // pass their own `adminAccess` — see PayloadMcpOAuthConfig.adminAccess.
+  const adminAccess: Access =
+    options.adminAccess ?? (({ req }) => req.user?.collection === userCollection)
+
   return {
     issuer: issuer.replace(/\/$/, ''),
     mcpPluginOptions,
-    userCollection: options.userCollection ?? 'users',
+    userCollection,
+    adminAccess,
     accessTokenTtlSeconds: options.accessTokenTtlSeconds ?? 3600,
     refreshTokenTtlSeconds: options.refreshTokenTtlSeconds ?? 86400,
     authCodeTtlSeconds: options.authCodeTtlSeconds ?? 300,
@@ -218,42 +227,32 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     { path: '/oauth/revoke', method: 'options', handler: corsPreflightHandler },
   ]
 
-  // T6.2 / T6.3: register admin views
-  const adminViews = {
-    ...(incomingConfig.admin?.components?.views ?? {}),
-    'oauth-tokens': {
-      Component: {
-        path: '@brainwebuk/payload-plugin-mcp-oauth/admin',
-        exportName: 'TokensView',
-      },
-      path: '/oauth/tokens' as `/${string}`,
+  // Apply the resolved admin gate to the operator-facing collections so they
+  // render as native entries under the "MCP" nav group (read) and can be
+  // managed there (update/delete) — while staying closed to the public. `create`
+  // remains denied: clients self-register via DCR, tokens are minted by the
+  // token endpoint. The sensitive, short-lived collections (auth codes, CSRF
+  // nonces) stay fully locked and hidden.
+  const withAdminAccess = (collection: typeof oauthClientsCollection): typeof oauthClientsCollection => ({
+    ...collection,
+    access: {
+      ...collection.access,
+      read: resolved.adminAccess,
+      update: resolved.adminAccess,
+      delete: resolved.adminAccess,
     },
-    'oauth-clients': {
-      Component: {
-        path: '@brainwebuk/payload-plugin-mcp-oauth/admin',
-        exportName: 'ClientsView',
-      },
-      path: '/oauth/clients' as `/${string}`,
-    },
-  }
+  })
 
-  // T5.5 / T6: merge collections, endpoints, and admin views
+  // T5.5 / T6: merge collections and endpoints
   return {
     ...incomingConfig,
     collections: [
       ...(incomingConfig.collections ?? []),
-      oauthClientsCollection,
+      withAdminAccess(oauthClientsCollection),
       oauthAuthCodesCollection,
-      oauthTokensCollection,
+      withAdminAccess(oauthTokensCollection),
       oauthCsrfNoncesCollection,
     ],
     endpoints: [...(incomingConfig.endpoints ?? []), ...oauthEndpoints],
-    admin: {
-      ...incomingConfig.admin,
-      components: {
-        ...incomingConfig.admin?.components,
-        views: adminViews,
-      },
-    },
   }
 }

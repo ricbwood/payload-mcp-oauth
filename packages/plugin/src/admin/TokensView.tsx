@@ -1,10 +1,7 @@
 import type React from 'react'
-import type { Payload, TypedUser, Where } from 'payload'
+import type { AdminViewServerProps, Where } from 'payload'
 
-export interface TokensViewProps {
-  payload: Payload
-  user: TypedUser | null | undefined
-}
+import { isOAuthAdmin } from './is-admin.js'
 
 interface TokenDoc {
   id: string
@@ -16,7 +13,15 @@ interface TokenDoc {
   revokedAt?: string | null
 }
 
-export async function TokensView({ payload, user }: TokensViewProps): Promise<React.ReactElement> {
+/**
+ * @deprecated OAuth tokens are now surfaced as a native admin collection under
+ * the "MCP" nav group. This standalone view is retained for apps that register
+ * it manually; prefer the native collection.
+ */
+export async function TokensView({ initPageResult }: AdminViewServerProps): Promise<React.ReactElement> {
+  // Payload passes AdminViewServerProps; the authenticated user and a scoped
+  // Payload instance live on initPageResult.req (NOT as top-level props).
+  const { user, payload } = initPageResult.req
   if (!user) {
     return (
       <div>
@@ -27,8 +32,7 @@ export async function TokensView({ payload, user }: TokensViewProps): Promise<Re
   }
 
   const userId = String((user as Record<string, unknown>)['id'] ?? '')
-  const isAdmin = (user as Record<string, unknown>)['role'] === 'admin' ||
-    Boolean((user as Record<string, unknown>)['_verified'])
+  const isAdmin = isOAuthAdmin(user)
 
   // Admins see all active tokens; users see only their own
   const whereClause: Where = isAdmin

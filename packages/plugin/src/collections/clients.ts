@@ -1,12 +1,14 @@
 import type { Access, CollectionConfig } from 'payload'
 
-// These OAuth collections are managed entirely server-side: the plugin's
-// endpoints operate with `overrideAccess: true` and the admin views read via the
-// Local API (which also bypasses access control). There is NO legitimate
-// external REST/GraphQL consumer, so deny all public access. This is a security
-// boundary: a previous `Boolean(req.user)` rule let ANY authenticated user
-// read/modify these rows — including rewriting a client's redirectUris (→ auth
-// code theft) or reading/deleting other users' tokens.
+// `create` is never a legitimate external operation: clients self-register via
+// the Dynamic Client Registration endpoint (which uses `overrideAccess`). Deny
+// it outright. `read`, `update`, and `delete` are gated to admins in plugin.ts
+// via the resolved `adminAccess` rule.
+//
+// Security boundary: the gate must NOT be a bare `Boolean(req.user)` — that let
+// ANY authenticated user rewrite a client's redirectUris (→ auth-code theft) or
+// read/delete other users' tokens. The default `adminAccess` scopes to the
+// configured admin user collection; see PayloadMcpOAuthConfig.adminAccess.
 const denyPublicAccess: Access = () => false
 
 export const oauthClientsCollection: CollectionConfig = {

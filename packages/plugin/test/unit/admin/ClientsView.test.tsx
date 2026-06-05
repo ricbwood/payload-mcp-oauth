@@ -8,6 +8,12 @@ function makePayload(docs: unknown[] = []) {
   }
 }
 
+// Payload passes AdminViewServerProps; the view reads user + payload from
+// initPageResult.req. Build that shape for the tests.
+function props(payload: unknown, user: unknown) {
+  return { initPageResult: { req: { payload, user } } } as never
+}
+
 function makeClient(overrides: Record<string, unknown> = {}) {
   return {
     id: 'client-doc-1',
@@ -22,24 +28,20 @@ function makeClient(overrides: Record<string, unknown> = {}) {
 
 describe('ClientsView', () => {
   it('shows login prompt when user is null', async () => {
-    const html = renderToString(await ClientsView({ payload: makePayload() as never, user: null }))
+    const html = renderToString(await ClientsView(props(makePayload(), null)))
     expect(html).toContain('logged in')
   })
 
   it('shows 403-style message for non-admin users', async () => {
     const payload = makePayload()
-    const html = renderToString(
-      await ClientsView({ payload: payload as never, user: { id: 'u1', role: 'editor' } as never }),
-    )
+    const html = renderToString(await ClientsView(props(payload, { id: 'u1', role: 'editor' })))
     expect(html).toContain('Access denied')
     expect(payload.find).not.toHaveBeenCalled()
   })
 
   it('renders client list for admin users', async () => {
     const payload = makePayload([makeClient()])
-    const html = renderToString(
-      await ClientsView({ payload: payload as never, user: { id: 'u1', role: 'admin' } as never }),
-    )
+    const html = renderToString(await ClientsView(props(payload, { id: 'u1', role: 'admin' })))
     expect(html).toContain('Test App')
     expect(html).toContain('client-uuid-1')
     expect(html).toContain('Active')
@@ -47,33 +49,32 @@ describe('ClientsView', () => {
 
   it('shows deactivate button for active clients', async () => {
     const payload = makePayload([makeClient({ isActive: true })])
-    const html = renderToString(
-      await ClientsView({ payload: payload as never, user: { id: 'u1', role: 'admin' } as never }),
-    )
+    const html = renderToString(await ClientsView(props(payload, { id: 'u1', role: 'admin' })))
     expect(html).toContain('Deactivate')
   })
 
   it('shows activate button for inactive clients', async () => {
     const payload = makePayload([makeClient({ isActive: false })])
-    const html = renderToString(
-      await ClientsView({ payload: payload as never, user: { id: 'u1', role: 'admin' } as never }),
-    )
+    const html = renderToString(await ClientsView(props(payload, { id: 'u1', role: 'admin' })))
     expect(html).toContain('Activate')
   })
 
   it('shows "No clients" message when list is empty', async () => {
     const payload = makePayload([])
-    const html = renderToString(
-      await ClientsView({ payload: payload as never, user: { id: 'u1', role: 'admin' } as never }),
-    )
+    const html = renderToString(await ClientsView(props(payload, { id: 'u1', role: 'admin' })))
     expect(html).toContain('No clients')
   })
 
   it('admin via isAdmin flag also passes access check', async () => {
     const payload = makePayload([makeClient()])
-    const html = renderToString(
-      await ClientsView({ payload: payload as never, user: { id: 'u1', isAdmin: true } as never }),
-    )
+    const html = renderToString(await ClientsView(props(payload, { id: 'u1', isAdmin: true })))
+    expect(html).not.toContain('Access denied')
+    expect(html).toContain('Test App')
+  })
+
+  it('authorises users with no role system (default starters)', async () => {
+    const payload = makePayload([makeClient()])
+    const html = renderToString(await ClientsView(props(payload, { id: 'u1', email: 'admin@example.com' })))
     expect(html).not.toContain('Access denied')
     expect(html).toContain('Test App')
   })

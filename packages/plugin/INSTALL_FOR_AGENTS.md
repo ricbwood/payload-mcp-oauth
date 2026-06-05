@@ -182,25 +182,32 @@ with a warning.
 
 ---
 
-## Step 5 — Regenerate the admin import map
+## Step 5 — Regenerate the admin import map (optional)
 
-The plugin registers two admin views (issued tokens, registered clients). Payload
-resolves admin components through a generated import map.
+This plugin registers **no custom admin components** (the OAuth screens are native
+collections), so it does **not** require an import map regeneration. Only run this
+if your app already maintains an import map and you want to keep it tidy:
 
 ```bash
 pnpm payload generate:importmap     # then commit the updated importMap.js
 ```
 
-**Verify:** `src/app/(payload)/admin/importMap.js` (or `app/(payload)/admin/importMap.js`
-if the app has no `src` directory) now references
-`@brainwebuk/payload-plugin-mcp-oauth/admin`.
+**Verify:** the app still builds. (Do **not** expect the import map to reference
+`@brainwebuk/payload-plugin-mcp-oauth/admin` — it won't; that's correct.)
 
 ---
 
-## Step 6 — Database migrations (the plugin adds 3 collections)
+## Step 6 — Apply the schema change (the plugin adds 4 collections)
 
-The plugin adds collections **`oauth-clients`**, **`oauth-auth-codes`**, and
-**`oauth-tokens`**. Their tables must be created before OAuth works.
+The plugin adds collections **`oauth-clients`**, **`oauth-auth-codes`**,
+**`oauth-tokens`**, and **`oauth-csrf-nonces`**. Their tables must exist before
+OAuth works. Pick the schema workflow the app already uses — **do not mix them**:
+
+- **If the app uses dev push** (e.g. `@payloadcms/db-sqlite`, or Postgres in push
+  mode — the default for the Payload starters): the schema is applied automatically
+  the next time the app boots in dev — no command needed. **Do not** run
+  `migrate:create`/`migrate` against a push-synced dev DB; you'll get
+  `table … already exists`.
 
 - **If the app uses Payload migrations** (a `migrations/` dir, `payload migrate` in
   the deploy flow):
@@ -211,19 +218,16 @@ The plugin adds collections **`oauth-clients`**, **`oauth-auth-codes`**, and
   ```
 
   After `migrate:create`, **open the generated migration and confirm it creates the
-  three `oauth_*` tables.** If it's empty (e.g. DB push is still enabled, or the
-  adapter already considers them present), `migrate` is a no-op and the tables are
-  never created — which surfaces later as `no such table: oauth_*` 500s.
+  `oauth_*` tables.** If it's empty (e.g. DB push is still enabled, or the adapter
+  already considers them present), `migrate` is a no-op and the tables are never
+  created — which surfaces later as `no such table: oauth_*` 500s.
 
-- **If the app uses dev push** (e.g. `@payloadcms/db-sqlite`, or Postgres in push
-  mode): the schema is applied automatically the next time the app boots in dev —
-  no command needed. For a production deploy with push disabled, create and run a
-  migration as above.
-
-**Verify:** open the admin UI → **Collections** and confirm **OAuth Clients**,
-**OAuth Auth Codes**, and **OAuth Tokens** appear. (Programmatically, a
-`payload run ./script.ts` that calls `payload.count({ collection: 'oauth-clients' })`
-should not throw — there is no bare REPL, so it must run inside a script.)
+**Verify:** open the admin UI → under the **MCP** nav group you should see **OAuth
+Clients** and **OAuth Tokens** (alongside **API Keys**) when logged in as a user of
+your `userCollection`. (`oauth-auth-codes` and `oauth-csrf-nonces` are intentionally
+hidden.) Programmatically, a `payload run ./script.ts` calling
+`payload.count({ collection: 'oauth-clients' })` should not throw — there is no bare
+REPL, so it must run inside a script.
 
 ---
 
@@ -258,8 +262,9 @@ screen.
 | **Every** route 500s; log: *"can't recognize the exported `config` field … it mustn't be reexported"* | `config` re-exported from the plugin in `proxy.ts`/`middleware.ts` | Step 3: declare `config` as a local literal in the file |
 | `/.well-known/...` returns the app's HTML or 404 | `proxy.ts`/`middleware.ts` missing, or `matcher` lacks the well-known paths | Step 3: add the file with the matcher shown |
 | `The "middleware" file convention is deprecated` warning (Next 16) | Using `middleware.ts` on Next 16 | Step 3: rename to `src/proxy.ts`, export as `proxy` (or run `npx @next/codemod middleware-to-proxy .`) |
-| Admin `oauth-tokens` / `oauth-clients` view fails to load | Import map not regenerated | Step 5: run `payload generate:importmap` |
-| OAuth requests 500 / "no such table: oauth_*" | Schema not migrated | Step 6: run migrations or boot in dev to push |
+| **OAuth Clients / OAuth Tokens** absent from the MCP nav group, or route shows *"Nothing found"* | Logged-in user not authorised by `adminAccess` (default: must belong to `userCollection`) | Log in as a `userCollection` user, or pass a custom `adminAccess` for mixed-role apps (see Plugin options) |
+| `migrate` fails: *"table … already exists"* | Ran `migrate` against a DB already created by dev push | Step 6: pick one workflow — don't mix dev push and migrations |
+| OAuth requests 500 / "no such table: oauth_*" | Schema not applied | Step 6: run migrations, or boot in dev to push |
 | Boots in dev, throws on deploy | `PMOAUTH_TOKEN_PEPPER` unset in production | Step 4: set a 32+ char pepper in the production env |
 
 ---
@@ -273,6 +278,7 @@ screen.
 | `issuer` | — (required) | Public base URL; OAuth issuer + metadata base. |
 | `mcpPluginOptions` | — (required) | The **same** object passed to `mcpPlugin()`. |
 | `userCollection` | `'users'` | Collection holding user accounts. |
+| `adminAccess` | authed user in `userCollection` | Gates who can view/manage the `oauth-clients` / `oauth-tokens` admin collections. Public REST/GraphQL stays denied. Override for user collections that mix admins with untrusted end-users, e.g. `({ req }) => req.user?.role === 'admin'`. |
 | `accessTokenTtlSeconds` | `3600` | Access-token lifetime. |
 | `refreshTokenTtlSeconds` | `86400` | Refresh-token lifetime. |
 | `authCodeTtlSeconds` | `300` | Authorization-code lifetime. |

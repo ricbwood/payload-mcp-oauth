@@ -1,10 +1,7 @@
 import type React from 'react'
-import type { Payload, TypedUser } from 'payload'
+import type { AdminViewServerProps } from 'payload'
 
-export interface ClientsViewProps {
-  payload: Payload
-  user: TypedUser | null | undefined
-}
+import { isOAuthAdmin } from './is-admin.js'
 
 interface ClientDoc {
   id: string
@@ -17,12 +14,15 @@ interface ClientDoc {
   createdAt?: string
 }
 
-function isAdminUser(user: TypedUser): boolean {
-  const u = user as Record<string, unknown>
-  return u['role'] === 'admin' || u['isAdmin'] === true || Array.isArray(u['roles']) && (u['roles'] as string[]).includes('admin')
-}
-
-export async function ClientsView({ payload, user }: ClientsViewProps): Promise<React.ReactElement> {
+/**
+ * @deprecated The OAuth clients are now surfaced as a native admin collection
+ * under the "MCP" nav group. This standalone view is retained for apps that
+ * register it manually; prefer the native collection.
+ */
+export async function ClientsView({ initPageResult }: AdminViewServerProps): Promise<React.ReactElement> {
+  // Payload passes AdminViewServerProps; the authenticated user and a scoped
+  // Payload instance live on initPageResult.req (NOT as top-level props).
+  const { user, payload } = initPageResult.req
   if (!user) {
     return (
       <div style={{ padding: '2rem' }}>
@@ -32,7 +32,7 @@ export async function ClientsView({ payload, user }: ClientsViewProps): Promise<
     )
   }
 
-  if (!isAdminUser(user)) {
+  if (!isOAuthAdmin(user)) {
     return (
       <div style={{ padding: '2rem' }}>
         <h1>OAuth Clients</h1>

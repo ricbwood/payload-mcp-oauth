@@ -126,9 +126,9 @@ try {
   Admin panel : ${baseUrl}/admin
       sign in : ${ADMIN.email}  /  ${ADMIN.password}
 
-  Plugin admin views:
-      tokens  : ${baseUrl}/admin/collections/oauth-tokens
+  OAuth admin collections (under the "MCP" nav group):
       clients : ${baseUrl}/admin/collections/oauth-clients
+      tokens  : ${baseUrl}/admin/collections/oauth-tokens
 
   OAuth discovery (served via the middleware):
       ${baseUrl}/.well-known/oauth-authorization-server

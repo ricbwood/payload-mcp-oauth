@@ -1,3 +1,4 @@
+import type { Access } from 'payload'
 import type { MCPPluginConfig } from '@payloadcms/plugin-mcp'
 import type { RateLimitOptions } from './middleware/rate-limit.js'
 
@@ -37,6 +38,28 @@ export interface PayloadMcpOAuthConfig {
    */
   userCollection?: string
 
+  /**
+   * Access rule deciding who may VIEW and MANAGE the OAuth collections
+   * (`oauth-clients`, `oauth-tokens`) in the Payload admin UI and over the
+   * Local API. This gates `read`, `update`, and `delete`; `create` is always
+   * denied (clients self-register via Dynamic Client Registration and tokens
+   * are minted by the token endpoint).
+   *
+   * The default authorises any authenticated user **belonging to the configured
+   * `userCollection`** (`req.user?.collection === userCollection`). For the
+   * standard Payload starters — where the `users` collection holds only
+   * operators/admins — this is correct and secure: the public/unauthenticated
+   * REST + GraphQL surface stays closed.
+   *
+   * ⚠️ If your `userCollection` mixes admins with untrusted end-users (e.g. a
+   * single `users` collection for both staff and customers), supply your own
+   * rule here — otherwise any logged-in user could rewrite a client's
+   * `redirectUris` (→ auth-code theft) or revoke others' tokens.
+   *
+   * @default ({ req }) => Boolean(req.user) && req.user.collection === userCollection
+   */
+  adminAccess?: Access
+
   /** Lifetime of issued access tokens in seconds. @default 3600 */
   accessTokenTtlSeconds?: number
 
@@ -54,6 +77,7 @@ export interface ResolvedConfig {
   issuer: string
   mcpPluginOptions: MCPPluginConfig
   userCollection: string
+  adminAccess: Access
   accessTokenTtlSeconds: number
   refreshTokenTtlSeconds: number
   authCodeTtlSeconds: number
