@@ -2,6 +2,7 @@ import type { Config, Endpoint, PayloadRequest } from 'payload'
 import type { PayloadMcpOAuthConfig, ResolvedConfig } from './types.js'
 import { oauthAuthCodesCollection } from './collections/auth-codes.js'
 import { oauthClientsCollection } from './collections/clients.js'
+import { oauthCsrfNoncesCollection } from './collections/csrf-nonces.js'
 import { oauthTokensCollection } from './collections/tokens.js'
 import { makeAuthorizeHandler } from './endpoints/authorize.js'
 import { makeConsentHandler } from './endpoints/consent.js'
@@ -244,6 +245,7 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
       oauthClientsCollection,
       oauthAuthCodesCollection,
       oauthTokensCollection,
+      oauthCsrfNoncesCollection,
     ],
     endpoints: [...(incomingConfig.endpoints ?? []), ...oauthEndpoints],
     admin: {

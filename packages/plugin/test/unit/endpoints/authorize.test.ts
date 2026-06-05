@@ -22,6 +22,7 @@ function makeReq(query: Record<string, string | undefined>, user: unknown = null
     headers: new Headers(),
     payload: {
       find: vi.fn().mockResolvedValue({ docs: [VALID_CLIENT] }),
+      create: vi.fn().mockResolvedValue({ id: 'nonce-doc-1' }),
     },
   }
 }
@@ -137,6 +138,16 @@ describe('makeAuthorizeHandler', () => {
     expect(verifyCsrfToken(token, 'user-1', VALID_QUERY.client_id, REGISTERED_URI, VALID_QUERY.code_challenge)).toBe(true)
     // ...but not for a different user (no cross-user consent).
     expect(verifyCsrfToken(token, 'other-user', VALID_QUERY.client_id, REGISTERED_URI, VALID_QUERY.code_challenge)).toBe(false)
+  })
+
+  it('embeds a single-use csrf_nonce in the consent form', async () => {
+    const req = makeReq(VALID_QUERY, { id: 'user-1' })
+    const res = await makeAuthorizeHandler()(req as never)
+    const html = await res.text()
+    expect(html).toContain('name="csrf_nonce"')
+    expect(req.payload.create).toHaveBeenCalledWith(
+      expect.objectContaining({ collection: 'oauth-csrf-nonces', overrideAccess: true }),
+    )
   })
 
   it('uses the configured consentPath as the form action', async () => {

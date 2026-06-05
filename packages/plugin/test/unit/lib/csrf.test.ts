@@ -1,13 +1,75 @@
 process.env['PMOAUTH_TOKEN_PEPPER'] = 'test-pepper-32-chars-minimum-length!!'
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { makeCsrfToken, verifyCsrfToken } from '../../../src/lib/csrf.js'
+import { generateCsrfNonce, storeCsrfNonce, consumeCsrfNonce, makeCsrfToken, verifyCsrfToken } from '../../../src/lib/csrf.js'
 
 // The four values the consent CSRF token is bound to.
 const P = ['user-1', 'client-1', 'https://app.example/cb', 'challenge-abc'] as const
 
 afterEach(() => {
   vi.useRealTimers()
+})
+
+describe('generateCsrfNonce', () => {
+  it('returns a 32-character hex string', () => {
+    const nonce = generateCsrfNonce()
+    expect(nonce).toMatch(/^[0-9a-f]{32}$/)
+  })
+
+  it('returns a different value on each call', () => {
+    expect(generateCsrfNonce()).not.toBe(generateCsrfNonce())
+  })
+})
+
+describe('storeCsrfNonce', () => {
+  it('calls payload.create with hashed nonce for the given user', async () => {
+    const create = vi.fn().mockResolvedValue({ id: 'nonce-1' })
+    const nonce = await storeCsrfNonce({ create } as never, 'user-42')
+    expect(nonce).toMatch(/^[0-9a-f]{32}$/)
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'oauth-csrf-nonces',
+        overrideAccess: true,
+        data: expect.objectContaining({ userId: 'user-42' }),
+      }),
+    )
+    // The stored nonceHash must NOT be the raw nonce (it is an HMAC)
+    const stored = create.mock.calls[0][0] as { data: { nonceHash: string } }
+    expect(stored.data.nonceHash).not.toBe(nonce)
+  })
+})
+
+describe('consumeCsrfNonce', () => {
+  it('returns true when update finds and marks the nonce consumed', async () => {
+    const update = vi.fn().mockResolvedValue({ docs: [{ id: 'nonce-1' }] })
+    expect(await consumeCsrfNonce({ update } as never, 'aabbccddeeff00112233445566778899', 'user-1')).toBe(true)
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        collection: 'oauth-csrf-nonces',
+        overrideAccess: true,
+        data: expect.objectContaining({ consumedAt: expect.any(String) }),
+      }),
+    )
+  })
+
+  it('returns false when the nonce is already consumed or expired (docs is empty)', async () => {
+    const update = vi.fn().mockResolvedValue({ docs: [] })
+    expect(await consumeCsrfNonce({ update } as never, 'aabbccddeeff00112233445566778899', 'user-1')).toBe(false)
+  })
+
+  it('returns false for a non-string nonce without calling update', async () => {
+    const update = vi.fn()
+    for (const bad of [123, true, null, {}, undefined] as unknown[]) {
+      expect(await consumeCsrfNonce({ update } as never, bad as never, 'u')).toBe(false)
+    }
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('returns false for an over-long nonce without calling update', async () => {
+    const update = vi.fn()
+    expect(await consumeCsrfNonce({ update } as never, 'a'.repeat(65), 'u')).toBe(false)
+    expect(update).not.toHaveBeenCalled()
+  })
 })
 
 describe('makeCsrfToken', () => {

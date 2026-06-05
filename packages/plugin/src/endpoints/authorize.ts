@@ -1,5 +1,5 @@
 import type { PayloadHandler } from 'payload'
-import { makeCsrfToken } from '../lib/csrf.js'
+import { makeCsrfToken, storeCsrfNonce } from '../lib/csrf.js'
 import { validateCodeChallenge } from '../lib/pkce.js'
 import { oauthErrorResponse, redirectResponse } from './helpers.js'
 
@@ -30,6 +30,7 @@ function buildConsentHtml(p: {
   userId: string
   resource: string
   csrfToken: string
+  csrfNonce: string
   consentPath: string
 }): string {
   const labels = p.scope.trim()
@@ -65,6 +66,7 @@ h1{font-size:1.25rem;margin-bottom:0.5rem}
 <input type="hidden" name="scope" value="${e(p.scope)}">
 <input type="hidden" name="resource" value="${e(p.resource)}">
 <input type="hidden" name="csrf_token" value="${e(p.csrfToken)}">
+<input type="hidden" name="csrf_nonce" value="${e(p.csrfNonce)}">
 <div class="actions">
 <button type="submit" name="decision" value="approve" class="btn btn-approve">Approve</button>
 <button type="submit" name="decision" value="deny" class="btn btn-deny">Deny</button>
@@ -156,8 +158,9 @@ export function makeAuthorizeHandler(
     const clientName = String(client['clientName'] ?? clientId)
     const userId = String((user as Record<string, unknown>)['id'] ?? '')
     const csrfToken = makeCsrfToken(userId, clientId, redirectUri, codeChallenge)
+    const csrfNonce = await storeCsrfNonce(req.payload, userId)
 
-    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId, resource, csrfToken, consentPath }), {
+    return new Response(buildConsentHtml({ clientName, scope, clientId, redirectUri, codeChallenge, codeChallengeMethod, state, userId, resource, csrfToken, csrfNonce, consentPath }), {
       status: 200,
       headers: {
         'Content-Type': 'text/html; charset=utf-8',
