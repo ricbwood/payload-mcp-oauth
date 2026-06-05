@@ -1,9 +1,10 @@
 import type { Access, CollectionAfterChangeHook, CollectionConfig } from 'payload'
 
-// Managed server-side only: the plugin endpoints use overrideAccess and the
-// admin TokensView reads via the Local API with its own per-user scoping. Deny
-// all public REST/GraphQL access — see clients.ts for the rationale (previously
-// any authenticated user could read all tokens or revoke/forge others').
+// `create` is never a legitimate external operation: tokens are minted by the
+// token endpoint (which uses `overrideAccess`). Deny it outright. `read`,
+// `update`, and `delete` are gated to admins in plugin.ts via the resolved
+// `adminAccess` rule — previously these were `() => false`, which also locked
+// out the admin panel, so the management screen was unreachable.
 const denyPublicAccess: Access = () => false
 
 const cascadeRevokeAccessTokens: CollectionAfterChangeHook = async ({
@@ -47,7 +48,11 @@ const cascadeRevokeAccessTokens: CollectionAfterChangeHook = async ({
 export const oauthTokensCollection: CollectionConfig = {
   slug: 'oauth-tokens',
   admin: {
-    hidden: true,
+    group: 'MCP',
+    useAsTitle: 'clientId',
+    defaultColumns: ['clientId', 'tokenType', 'scope', 'expiresAt', 'revokedAt'],
+    description:
+      'Access and refresh tokens issued via OAuth. Set "revoked at" (or delete a row) to revoke a connection. Read-only otherwise.',
   },
   access: {
     create: denyPublicAccess,
@@ -68,6 +73,7 @@ export const oauthTokensCollection: CollectionConfig = {
       index: true,
       admin: {
         readOnly: true,
+        hidden: true,
         description: 'HMAC-SHA-256 hash of the token plaintext. Never store plaintext.',
       },
     },

@@ -74,15 +74,17 @@ try {
     check('packaging: . , /middleware and /admin subpaths all resolve via exports map', false, String(err.message))
   }
 
-  // 3. Import map: the OAuth admin views must be wired in.
+  // 3. Import map: the plugin registers NO custom admin components — the OAuth
+  // screens are native collections under the MCP nav group. Guard against a
+  // regression that re-introduces the (Payload-v3-incompatible) custom views.
   console.log('\n[3/6] Checking the admin import map…')
   check(
-    'importmap: references the plugin admin views (TokensView/ClientsView)',
-    importMapContent.includes('payload-plugin-mcp-oauth/admin') && /Tokens|Clients/i.test(importMapContent),
-    'run `payload generate:importmap` — the oauth/tokens & oauth/clients views need it',
+    'importmap: plugin injects no custom admin components (OAuth screens are native collections)',
+    !importMapContent.includes('payload-plugin-mcp-oauth/admin'),
+    'import map unexpectedly references the plugin /admin subpath — the OAuth admin UI should be native collections, not custom views',
   )
 
-  // 4. DB migrations: the plugin's three collections must be queryable.
+  // 4. DB migrations: the plugin's collections must be queryable.
   console.log('\n[4/6] Checking the OAuth collections (schema push)…')
   check(
     'migrations: oauth-clients / oauth-auth-codes / oauth-tokens are queryable',

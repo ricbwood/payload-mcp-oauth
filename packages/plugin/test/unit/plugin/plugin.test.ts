@@ -111,6 +111,56 @@ describe('buildPlugin — collections (T5.5)', () => {
   })
 })
 
+describe('buildPlugin — admin access gate', () => {
+  type AccessFn = (args: { req: { user: unknown } }) => unknown
+  const coll = (result: import('payload').Config, slug: string) =>
+    result.collections?.find((c) => c.slug === slug)
+  const adminReq = (collection = 'users') => ({ req: { user: { id: 'u1', collection } } })
+
+  it('opens read/update/delete on oauth-clients to admin-collection users, denies others', () => {
+    const result = buildPlugin(makeConfig(), makeOptions())
+    const access = coll(result, 'oauth-clients')?.access
+    for (const op of ['read', 'update', 'delete'] as const) {
+      const fn = access?.[op] as AccessFn
+      expect(fn(adminReq()), `${op} should allow admin`).toBe(true)
+      expect(fn({ req: { user: null } }), `${op} should deny anon`).toBeFalsy()
+      expect(fn(adminReq('customers')), `${op} should deny other collection`).toBe(false)
+    }
+  })
+
+  it('keeps create denied on oauth-clients (clients self-register via DCR)', () => {
+    const result = buildPlugin(makeConfig(), makeOptions())
+    const create = coll(result, 'oauth-clients')?.access?.create as AccessFn
+    expect(create(adminReq())).toBe(false)
+  })
+
+  it('applies the same gate to oauth-tokens read', () => {
+    const result = buildPlugin(makeConfig(), makeOptions())
+    const read = coll(result, 'oauth-tokens')?.access?.read as AccessFn
+    expect(read(adminReq())).toBe(true)
+    expect(read({ req: { user: null } })).toBeFalsy()
+  })
+
+  it('uses the configured userCollection in the default gate', () => {
+    const result = buildPlugin(makeConfig(), makeOptions({ userCollection: 'admins' }))
+    const read = coll(result, 'oauth-clients')?.access?.read as AccessFn
+    expect(read(adminReq('admins'))).toBe(true)
+    expect(read(adminReq('users'))).toBe(false)
+  })
+
+  it('honours a custom adminAccess override', () => {
+    let called = false
+    const custom = () => {
+      called = true
+      return true
+    }
+    const result = buildPlugin(makeConfig(), makeOptions({ adminAccess: custom }))
+    const read = coll(result, 'oauth-clients')?.access?.read as AccessFn
+    expect(read(adminReq('anything'))).toBe(true)
+    expect(called).toBe(true)
+  })
+})
+
 describe('buildPlugin — endpoints (T5.5)', () => {
   it('registers all 7 OAuth endpoints', () => {
     const result = buildPlugin(makeConfig(), makeOptions())

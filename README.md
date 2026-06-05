@@ -6,14 +6,15 @@ so a Payload-backed MCP server can be added as a **Custom Connector in Claude.ai
 alongside the existing API-key flow.
 
 The plugin is **purely additive**: it wraps the MCP endpoint handler and adds the
-OAuth endpoints, collections, and admin views. Your existing API-key MCP clients
-keep working unchanged.
+OAuth endpoints and collections. Your existing API-key MCP clients keep working
+unchanged.
 
 - OAuth 2.1 authorization-code flow with **PKCE (S256 only)**
 - **Dynamic Client Registration** (RFC 7591) — Claude.ai self-registers
 - Discovery via RFC 8414 / RFC 9728 well-known documents
 - Tokens hashed at rest (HMAC-SHA-256); refresh + revocation supported
-- Admin views for issued tokens and registered clients
+- **OAuth Clients** and **OAuth Tokens** appear as admin collections under the
+  **MCP** nav group (admin-only; the public REST/GraphQL surface stays closed)
 
 > **Installing with an AI coding agent?** Point it at
 > [`INSTALL_FOR_AGENTS.md`](./packages/plugin/INSTALL_FOR_AGENTS.md) (shipped in the
@@ -162,29 +163,32 @@ In development a built-in insecure pepper is used if `PMOAUTH_TOKEN_PEPPER` is
 unset (with a warning). In `NODE_ENV=production` the plugin **throws on boot** if
 it is missing or shorter than 32 characters.
 
-### 5. Regenerate the admin import map
+### 5. Regenerate the admin import map (if your app uses one)
 
-The plugin registers two admin views (issued tokens, registered clients). Payload
-resolves admin components through a generated import map, so regenerate it after
-installing:
+This plugin registers no custom admin components, so it doesn't *require* an import
+map regeneration. If your app already maintains `src/app/(payload)/admin/importMap.js`,
+regenerating it after installing is harmless and keeps it tidy:
 
 ```bash
 pnpm payload generate:importmap
 ```
 
-Commit the updated `src/app/(payload)/admin/importMap.js` (drop the `src/` prefix
-if your app doesn't use a `src` directory).
+(Drop the `src/` prefix if your app doesn't use a `src` directory.)
 
-### 6. Run database migrations
+### 6. Apply the schema change
 
-The plugin adds three collections — `oauth-clients`, `oauth-auth-codes`,
-`oauth-tokens`. Apply your usual schema step:
+The plugin adds collections (`oauth-clients`, `oauth-auth-codes`, `oauth-tokens`,
+`oauth-csrf-nonces`). Use whichever schema workflow your app already uses — **don't
+mix them**:
 
-```bash
-pnpm payload migrate        # or your adapter's dev push on next boot
-```
+- **Dev push** (default for SQLite/Postgres in dev): just start the app; the new
+  tables are pushed on next boot. Do **not** run `migrate:create`/`migrate` against
+  a push-synced dev DB — you'll get *"table … already exists"*.
+- **Migrations** (production): run `pnpm payload migrate:create` to generate a
+  migration that includes the new collections, then `pnpm payload migrate`.
 
-That's it — start the app and the OAuth endpoints are live.
+That's it — start the app and the OAuth endpoints are live, with **OAuth Clients**
+and **OAuth Tokens** under the **MCP** group in the admin sidebar.
 
 ---
 
@@ -214,10 +218,32 @@ curl https://cms.example.com/.well-known/oauth-authorization-server
 | `issuer` | `string` | — (required) | Public base URL; OAuth issuer + metadata base. |
 | `mcpPluginOptions` | `MCPPluginConfig` | — (required) | The **same** object passed to `mcpPlugin()`. |
 | `userCollection` | `string` | `'users'` | Collection holding user accounts. |
+| `adminAccess` | `Access` | authenticated user in `userCollection` | Who may view/manage the OAuth collections in the admin. See below. |
 | `accessTokenTtlSeconds` | `number` | `3600` | Access-token lifetime. |
 | `refreshTokenTtlSeconds` | `number` | `86400` | Refresh-token lifetime. |
 | `authCodeTtlSeconds` | `number` | `300` | Authorization-code lifetime. |
 | `rateLimits` | `RateLimitOptions` | `{}` | Per-endpoint rate-limit overrides. |
+
+### Admin UI & access
+
+`oauth-clients` and `oauth-tokens` render as collections under the **MCP** nav
+group (alongside the MCP plugin's API Keys). `read`/`update`/`delete` are gated by
+`adminAccess`; `create` is always denied (clients self-register via DCR, tokens are
+minted by the token endpoint). `oauth-auth-codes` and `oauth-csrf-nonces` stay
+hidden and fully locked.
+
+The default `adminAccess` authorises any authenticated user **in your
+`userCollection`** and denies the public REST/GraphQL surface — correct for the
+standard starters, where `users` holds only operators. **If your `userCollection`
+mixes admins with untrusted end-users, pass your own rule:**
+
+```ts
+payloadMcpOAuth({
+  issuer,
+  mcpPluginOptions: mcpOptions,
+  adminAccess: ({ req }) => req.user?.role === 'admin',
+})
+```
 
 ### Endpoints added
 
@@ -240,7 +266,8 @@ handler unchanged.
 | `/.well-known/...` returns the app's HTML / 404 | `proxy.ts` / `middleware.ts` missing or its `matcher` doesn't include the well-known paths (step 3). |
 | **Every** route 500s; log says *"can't recognize the exported `config` field … it mustn't be reexported"* | `config` was re-exported from `…/middleware` instead of declared as a local literal in your `proxy.ts` / `middleware.ts` (step 3). |
 | `The "middleware" file convention is deprecated` warning (Next 16) | Rename `src/middleware.ts` → `src/proxy.ts` and export the handler as `proxy` (step 3). |
-| Admin `/oauth/tokens` or `/oauth/clients` view fails to load | Import map not regenerated (step 5). |
+| **OAuth Clients / OAuth Tokens** missing from the admin nav, or their route shows *"Nothing found"* | The logged-in user isn't authorised by `adminAccess`. By default they must belong to `userCollection`; for mixed-role apps pass a custom `adminAccess` (see *Admin UI & access*). |
+| `migrate` fails with *"table … already exists"* | You ran `migrate` against a DB already created by dev push — pick one workflow (step 6). |
 | Boots fine in dev, throws on deploy | `PMOAUTH_TOKEN_PEPPER` not set in production (step 4). |
 
 ---
