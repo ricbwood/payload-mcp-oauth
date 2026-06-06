@@ -69,10 +69,10 @@ fixes; use `>= 0.3.3`).
   (when logged in as a user of your `userCollection`).
 
 ## Make it usable for AI agents (recommended)
-Agents only know what the server tells them. On `mcpPlugin()` set top-level
-`instructions` (how to use the server + non-obvious field rules), per-collection
-`description`, and field `admin.description` (these flow into the generated tool
-schemas). For gnarly create flows, define an MCP `prompt`. A Claude *Skill*
+Agents only know what the server tells them. On `mcpPlugin()` set
+`serverOptions.instructions` (how to use the server + non-obvious field rules),
+per-collection `description`, and field `admin.description` (these flow into the
+generated tool schemas). For gnarly create flows, define an MCP `prompt`. A Claude *Skill*
 cannot reach a connecting web agent — `instructions`/`prompts` are the
 protocol-native bridge.
 
