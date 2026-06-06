@@ -1,0 +1,17 @@
+{
+  "name": "brainwebuk",
+  "owner": {
+    "name": "BrainWeb",
+    "url": "https://www.brainweb.co.uk/"
+  },
+  "description": "BrainWeb Claude Code plugins.",
+  "plugins": [
+    {
+      "name": "payload-mcp-oauth",
+      "source": "./",
+      "description": "Install/configure helper for @brainwebuk/payload-plugin-mcp-oauth (OAuth 2.1 + PKCE for a Payload MCP server).",
+      "category": "productivity",
+      "keywords": ["payload", "mcp", "oauth"]
+    }
+  ]
+}

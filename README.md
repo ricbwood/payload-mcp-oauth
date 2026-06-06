@@ -231,6 +231,64 @@ curl https://cms.example.com/.well-known/oauth-authorization-server
 
 ---
 
+## Making the MCP usable for AI agents
+
+Once connected, an agent only knows what the MCP server *tells* it. Tools
+generated from rich collections (a page builder with nested blocks, conditional
+fields, etc.) are large and non-obvious, so agents trial-and-error their way
+through `create*` calls. Close that gap with the guidance channels
+`@payloadcms/plugin-mcp` exposes — all delivered **server → agent** over the
+protocol, so they reach every client (Claude.ai web, Desktop, Code, and
+non-Claude MCP clients):
+
+- **`instructions`** — a top-level "how to use this server" string on `mcpPlugin()`.
+- **per-collection `description`** — tells the agent when/why to use a collection.
+- **field `admin.description`** — flows into each tool's input schema, so the
+  agent reads field rules inline (e.g. "required only when …").
+- **`prompts`** — pre-baked, guided workflows the agent can invoke.
+
+```ts
+mcpPlugin({
+  serverInfo: { name: 'Author Website', version: '1.0.0' },
+  instructions: `
+This server manages an author marketing site (pages, posts, media).
+- Publish by setting "_status": "published".
+- pages.hero.type is none|lowImpact|mediumImpact|highImpact; high/mediumImpact
+  REQUIRE hero.media (a Media id) — upload first; prefer lowImpact otherwise.
+- pages.layout is an array of blocks: content, cta, mediaBlock, archive.
+- If a tool schema is large, create a minimal doc first, then add blocks with the update tool.`,
+  collections: {
+    pages: {
+      description: 'Landing/marketing pages built from a hero + layout blocks.',
+      enabled: { find: true, create: true, update: true },
+    },
+  },
+})
+```
+
+> **Why not ship a Claude Skill for this?** Skills load only from the *consuming*
+> client's own environment — an MCP server (or this npm package) cannot push a
+> Skill to a connecting Claude.ai/Desktop agent. `instructions`/`prompts` are the
+> protocol-native equivalent and reach every client automatically. (A Skill *is*
+> useful for the **install** experience — see below.)
+
+### Install helper for Claude Code (optional)
+
+This repo doubles as a Claude Code plugin marketplace with an `install` skill that
+walks Claude Code through wiring up the plugin (config, proxy, env, schema) and the
+common pitfalls. In Claude Code:
+
+```
+/plugin marketplace add ricbwood/payload-mcp-oauth
+/plugin install payload-mcp-oauth@brainwebuk
+```
+
+Then ask Claude Code to "install payload-plugin-mcp-oauth" (or run
+`/payload-mcp-oauth:install`). This helps the **developer** installing the plugin;
+because Skills are client-side it has no effect on the runtime connector agent.
+
+---
+
 ## Configuration
 
 | Option | Type | Default | Description |
