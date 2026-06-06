@@ -241,7 +241,7 @@ through `create*` calls. Close that gap with the guidance channels
 protocol, so they reach every client (Claude.ai web, Desktop, Code, and
 non-Claude MCP clients):
 
-- **`instructions`** — a top-level "how to use this server" string on `mcpPlugin()`.
+- **`serverOptions.instructions`** — a "how to use this server" string on `mcpPlugin()`.
 - **per-collection `description`** — tells the agent when/why to use a collection.
 - **field `admin.description`** — flows into each tool's input schema, so the
   agent reads field rules inline (e.g. "required only when …").
@@ -249,14 +249,16 @@ non-Claude MCP clients):
 
 ```ts
 mcpPlugin({
-  serverInfo: { name: 'Author Website', version: '1.0.0' },
-  instructions: `
+  serverOptions: {
+    serverInfo: { name: 'Author Website', version: '1.0.0' },
+    instructions: `
 This server manages an author marketing site (pages, posts, media).
 - Publish by setting "_status": "published".
 - pages.hero.type is none|lowImpact|mediumImpact|highImpact; high/mediumImpact
   REQUIRE hero.media (a Media id) — upload first; prefer lowImpact otherwise.
-- pages.layout is an array of blocks: content, cta, mediaBlock, archive.
+- pages.layout is an array of blocks: content, cta, mediaBlock, archive, formBlock.
 - If a tool schema is large, create a minimal doc first, then add blocks with the update tool.`,
+  },
   collections: {
     pages: {
       description: 'Landing/marketing pages built from a hero + layout blocks.',
