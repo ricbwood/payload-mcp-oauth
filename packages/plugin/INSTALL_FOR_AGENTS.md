@@ -270,6 +270,7 @@ screen.
 | Consent screen renders, but **Approve** → `401 access_denied / "Authentication required"` | Plugin bug ≤ 0.3.0: consent page sent `Referrer-Policy: no-referrer` → browser sent `Origin: null` on the POST → Payload dropped the session (GET render has no Origin, so it worked) | Upgrade to **≥ 0.3.1** (fixed). If it persists, confirm `serverURL` / `NEXT_PUBLIC_SERVER_URL` exactly matches the public origin (scheme, host, no trailing slash) |
 | **OAuth Clients / OAuth Tokens** absent from the MCP nav group, or route shows *"Nothing found"* | Logged-in user not authorised by `adminAccess` (default: must belong to `userCollection`) | Log in as a `userCollection` user, or pass a custom `adminAccess` for mixed-role apps (see Plugin options) |
 | `migrate` fails: *"table … already exists"* | Ran `migrate` against a DB already created by dev push | Step 6: pick one workflow — don't mix dev push and migrations |
+| `SQLITE_ERROR: no such column: oauth_clients_id` (rebuilding `payload_locked_documents_rels`) | SQLite push can't add the new lock-FK columns to an already-pushed DB | Upgrade to **≥ 0.3.2** (collections now set `lockDocuments: false`). On ≤ 0.3.1: add the plugin before first boot, or reset the dev DB (`rm your.db*`) |
 | OAuth requests 500 / "no such table: oauth_*" | Schema not applied | Step 6: run migrations, or boot in dev to push |
 | Boots in dev, throws on deploy | `PMOAUTH_TOKEN_PEPPER` unset in production | Step 4: set a 32+ char pepper in the production env |
 

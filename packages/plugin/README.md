@@ -276,6 +276,7 @@ handler unchanged.
 | Consent screen renders, but **Approve** returns `401 access_denied / "Authentication required"` | Plugin bug in **≤ 0.3.0**: the consent page sent `Referrer-Policy: no-referrer`, so browsers sent `Origin: null` on the Approve POST and Payload dropped the session (the `GET` render has no `Origin`, so it worked; the `POST` didn't). **Fixed in 0.3.1 — upgrade.** If it persists on ≥ 0.3.1, your `serverURL` doesn't match the origin the browser uses — check `NEXT_PUBLIC_SERVER_URL` (exact scheme + host, no trailing slash). |
 | **OAuth Clients / OAuth Tokens** missing from the admin nav, or their route shows *"Nothing found"* | The logged-in user isn't authorised by `adminAccess`. By default they must belong to `userCollection`; for mixed-role apps pass a custom `adminAccess` (see *Admin UI & access*). |
 | `migrate` fails with *"table … already exists"* | You ran `migrate` against a DB already created by dev push — pick one workflow (step 6). |
+| `SQLITE_ERROR: no such column: oauth_clients_id` while rebuilding `payload_locked_documents_rels` on `pnpm dev` | SQLite push can't add the new collections' lock-FK columns to an **already-pushed** DB (a Payload/drizzle rebuild quirk). **Fixed in 0.3.2** — the OAuth collections set `lockDocuments: false`, so they add no column there. On ≤ 0.3.1: add the plugin *before* first boot, or reset the dev DB (`rm your.db*`) so the schema is created fresh. |
 | Boots fine in dev, throws on deploy | `PMOAUTH_TOKEN_PEPPER` not set in production (step 4). |
 
 ---

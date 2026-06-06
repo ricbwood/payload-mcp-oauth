@@ -28,6 +28,9 @@ const sweepExpiredNonces: CollectionAfterChangeHook = async ({ operation, req })
 
 export const oauthCsrfNoncesCollection: CollectionConfig = {
   slug: 'oauth-csrf-nonces',
+  // Server-managed — opt out of document-locking so no FK column is added to
+  // payload_locked_documents_rels (avoids the SQLite push rebuild bug; see clients.ts).
+  lockDocuments: false,
   admin: { hidden: true },
   access: {
     create: denyPublicAccess,
