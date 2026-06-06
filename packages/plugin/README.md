@@ -238,6 +238,7 @@ curl https://cms.example.com/.well-known/oauth-authorization-server
 | `issuer` | `string` | — (required) | Public base URL; OAuth issuer + metadata base. |
 | `mcpPluginOptions` | `MCPPluginConfig` | — (required) | The **same** object passed to `mcpPlugin()`. |
 | `userCollection` | `string` | `'users'` | Collection holding user accounts. |
+| `disabled` | `boolean` | `false` | Turn OAuth off without uninstalling: no endpoints, no token wiring, `mcpPluginOptions` untouched (API-key MCP keeps working). Collections stay registered for schema consistency. Also auto-detected when `mcpPluginOptions.disabled` is set. |
 | `adminAccess` | `Access` | authenticated user in `userCollection` | Who may view/manage the OAuth collections in the admin. See below. |
 | `accessTokenTtlSeconds` | `number` | `3600` | Access-token lifetime. |
 | `refreshTokenTtlSeconds` | `number` | `86400` | Refresh-token lifetime. |

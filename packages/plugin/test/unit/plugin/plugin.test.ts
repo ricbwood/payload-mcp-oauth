@@ -124,6 +124,50 @@ describe('buildPlugin — collections (T5.5)', () => {
   })
 })
 
+describe('buildPlugin — disabled / no-op', () => {
+  it('disabled: true keeps the collections but adds no OAuth endpoints', () => {
+    const result = buildPlugin(makeConfig(), makeOptions({ disabled: true }))
+    const slugs = result.collections?.map((c) => c.slug) ?? []
+    expect(slugs).toContain('oauth-clients')
+    expect(slugs).toContain('oauth-tokens')
+    const paths = result.endpoints?.map((e) => e.path) ?? []
+    expect(paths).not.toContain('/oauth/token')
+    expect(paths).not.toContain('/.well-known/oauth-authorization-server')
+  })
+
+  it('treats a disabled MCP plugin as disabled — no endpoints, and does NOT throw without /mcp', () => {
+    // mcp disabled ⇒ it registers no /mcp endpoint; we must not throw PLUGIN_ORDER.
+    const noEndpoints = makeConfig([])
+    const opts = makeOptions({ mcpPluginOptions: { disabled: true } as never })
+    expect(() => buildPlugin(noEndpoints, opts)).not.toThrow()
+    const result = buildPlugin(makeConfig([]), opts)
+    expect(result.collections?.map((c) => c.slug)).toContain('oauth-clients')
+    expect(result.endpoints?.some((e) => e.path === '/oauth/token')).toBeFalsy()
+  })
+
+  it('disabled path skips issuer/pepper validation (returns before resolveConfig)', () => {
+    expect(() => buildPlugin(makeConfig(), makeOptions({ disabled: true, issuer: '' }))).not.toThrow()
+  })
+
+  it('still throws PLUGIN_ORDER when ENABLED and no /mcp endpoint exists', () => {
+    expect(() => buildPlugin(makeConfig([]), makeOptions())).toThrow(PayloadMcpOAuthError)
+  })
+
+  it('payloadMcpOAuth does NOT install overrideAuth when disabled', async () => {
+    const { payloadMcpOAuth } = await import('../../../src/index.js')
+    const mcpOpts = {}
+    payloadMcpOAuth(makeOptions({ disabled: true, mcpPluginOptions: mcpOpts }))
+    expect((mcpOpts as Record<string, unknown>)['overrideAuth']).toBeUndefined()
+  })
+
+  it('payloadMcpOAuth does NOT install overrideAuth when the MCP plugin is disabled', async () => {
+    const { payloadMcpOAuth } = await import('../../../src/index.js')
+    const mcpOpts = { disabled: true }
+    payloadMcpOAuth(makeOptions({ mcpPluginOptions: mcpOpts as never }))
+    expect((mcpOpts as Record<string, unknown>)['overrideAuth']).toBeUndefined()
+  })
+})
+
 describe('buildPlugin — admin access gate', () => {
   type AccessFn = (args: { req: { user: unknown } }) => unknown
   const coll = (result: import('payload').Config, slug: string) =>

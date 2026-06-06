@@ -285,6 +285,7 @@ screen.
 | `issuer` | — (required) | Public base URL; OAuth issuer + metadata base. |
 | `mcpPluginOptions` | — (required) | The **same** object passed to `mcpPlugin()`. |
 | `userCollection` | `'users'` | Collection holding user accounts. |
+| `disabled` | `false` | Turn OAuth off without uninstalling — no endpoints/token wiring, `mcpPluginOptions` untouched (API-key MCP keeps working); collections stay for schema consistency. Auto-detected when `mcpPluginOptions.disabled` is set, so a disabled MCP plugin won't crash boot. |
 | `adminAccess` | authed user in `userCollection` | Gates who can view/manage the `oauth-clients` / `oauth-tokens` admin collections. Public REST/GraphQL stays denied. Override for user collections that mix admins with untrusted end-users, e.g. `({ req }) => req.user?.role === 'admin'`. |
 | `accessTokenTtlSeconds` | `3600` | Access-token lifetime. |
 | `refreshTokenTtlSeconds` | `86400` | Refresh-token lifetime. |

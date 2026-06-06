@@ -33,6 +33,20 @@ export interface PayloadMcpOAuthConfig {
   mcpPluginOptions: MCPPluginConfig
 
   /**
+   * Turn the OAuth layer off without uninstalling. When `true` (or when the MCP
+   * plugin itself is disabled via `mcpPluginOptions.disabled`), the plugin adds
+   * NO endpoints, does NO token-validation wiring, and leaves `mcpPluginOptions`
+   * untouched — the MCP server keeps working with API keys only.
+   *
+   * The OAuth collections are still registered (they're relationally isolated, so
+   * this is safe) to keep the database schema consistent for migrations — matching
+   * how `@payloadcms/plugin-mcp` and the official plugin template behave.
+   *
+   * @default false
+   */
+  disabled?: boolean
+
+  /**
    * The Payload collection that holds user accounts.
    * @default 'users'
    */
