@@ -80,6 +80,19 @@ export default buildConfig({
 > (the API-key path keeps working, which makes this easy to miss). The plugin
 > also throws on boot if it is registered *before* `mcpPlugin()`.
 
+> **Design note — why we mutate `mcpPluginOptions`.** Payload's plugin guidance
+> says "never mutate the incoming config," and everything this plugin *adds*
+> (collections, endpoints) is done by spreading the incoming config, not mutating
+> it. The one deliberate exception is `mcpPluginOptions`: the OAuth token
+> validator has to live inside `@payloadcms/plugin-mcp`'s request-handler closure,
+> which Payload captures when *that* plugin runs — so we must set `overrideAuth` on
+> the shared options object *before* `mcpPlugin()` executes (hence the
+> same-reference rule above). This mutates a **sibling plugin's** options, which the
+> [Plugin API](https://payloadcms.com/docs/plugins/plugin-api) explicitly permits
+> (`plugins['…']?.options`), rather than our own incoming config. It's the most
+> fragile part of the setup, so we're tracking less-footgun-prone alternatives in
+> [issue #51](https://github.com/ricbwood/payload-mcp-oauth/issues/51).
+
 ### 3. Add the proxy (Next.js 16) / middleware (Next.js 14–15)
 
 OAuth discovery (`/.well-known/...`) and bare-host MCP connectors need two
