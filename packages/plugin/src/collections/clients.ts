@@ -13,6 +13,14 @@ const denyPublicAccess: Access = () => false
 
 export const oauthClientsCollection: CollectionConfig = {
   slug: 'oauth-clients',
+  // Server-managed collection — opt out of Payload document-locking. This also
+  // removes its polymorphic FK column from `payload_locked_documents_rels`, so
+  // installing the plugin doesn't force a rebuild of that table. On SQLite dev
+  // push, that rebuild's INSERT…SELECT references the not-yet-existing new
+  // columns and fails with `no such column: oauth_clients_id` when the plugin is
+  // added to an already-pushed DB. (Payload uses this same opt-out for its own
+  // system collections.)
+  lockDocuments: false,
   admin: {
     useAsTitle: 'clientName',
     group: 'MCP',

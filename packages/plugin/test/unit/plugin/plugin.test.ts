@@ -109,6 +109,19 @@ describe('buildPlugin — collections (T5.5)', () => {
     const result = buildPlugin(config, makeOptions())
     expect(result.collections?.map((c) => c.slug)).toContain('posts')
   })
+
+  it('opts every OAuth collection out of document-locking (lockDocuments: false)', () => {
+    // Keeps the plugin's collections out of `payload_locked_documents_rels`, so
+    // installing it never forces a rebuild of that table — which fails on SQLite
+    // dev push when added to an already-pushed DB (no such column: oauth_*_id).
+    const result = buildPlugin(makeConfig(), makeOptions())
+    const oauthSlugs = ['oauth-clients', 'oauth-auth-codes', 'oauth-tokens', 'oauth-csrf-nonces']
+    for (const slug of oauthSlugs) {
+      const c = result.collections?.find((col) => col.slug === slug)
+      expect(c, `${slug} should be registered`).toBeTruthy()
+      expect(c?.lockDocuments, `${slug} must set lockDocuments: false`).toBe(false)
+    }
+  })
 })
 
 describe('buildPlugin — admin access gate', () => {

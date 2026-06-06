@@ -48,6 +48,9 @@ const sweepExpiredCodes: CollectionAfterChangeHook = async ({ operation, req }) 
 
 export const oauthAuthCodesCollection: CollectionConfig = {
   slug: 'oauth-auth-codes',
+  // Server-managed — opt out of document-locking so no FK column is added to
+  // payload_locked_documents_rels (avoids the SQLite push rebuild bug; see clients.ts).
+  lockDocuments: false,
   admin: {
     hidden: true,
   },

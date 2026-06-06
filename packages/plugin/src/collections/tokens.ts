@@ -47,6 +47,9 @@ const cascadeRevokeAccessTokens: CollectionAfterChangeHook = async ({
 
 export const oauthTokensCollection: CollectionConfig = {
   slug: 'oauth-tokens',
+  // Server-managed — opt out of document-locking so no FK column is added to
+  // payload_locked_documents_rels (avoids the SQLite push rebuild bug; see clients.ts).
+  lockDocuments: false,
   admin: {
     group: 'MCP',
     useAsTitle: 'clientId',
