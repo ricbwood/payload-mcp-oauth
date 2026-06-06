@@ -1,4 +1,4 @@
-import type { Access, Config, Endpoint, PayloadRequest } from 'payload'
+import type { Access, CollectionConfig, Config, Endpoint, PayloadRequest } from 'payload'
 import type { PayloadMcpOAuthConfig, ResolvedConfig } from './types.js'
 import { oauthAuthCodesCollection } from './collections/auth-codes.js'
 import { oauthClientsCollection } from './collections/clients.js'
@@ -79,24 +79,66 @@ function resolveConfig(options: PayloadMcpOAuthConfig): ResolvedConfig {
     )
   }
 
-  const userCollection = options.userCollection ?? 'users'
-  // Default admin gate: an authenticated user in the configured admin collection.
-  // Closes the public REST/GraphQL surface while letting admin-panel operators
-  // see and manage the collections. Apps with mixed-role user collections should
-  // pass their own `adminAccess` — see PayloadMcpOAuthConfig.adminAccess.
-  const adminAccess: Access =
-    options.adminAccess ?? (({ req }) => req.user?.collection === userCollection)
-
   return {
     issuer: issuer.replace(/\/$/, ''),
     mcpPluginOptions,
-    userCollection,
-    adminAccess,
+    userCollection: options.userCollection ?? 'users',
+    adminAccess: resolveAdminAccess(options),
     accessTokenTtlSeconds: options.accessTokenTtlSeconds ?? 3600,
     refreshTokenTtlSeconds: options.refreshTokenTtlSeconds ?? 86400,
     authCodeTtlSeconds: options.authCodeTtlSeconds ?? 300,
     rateLimits: options.rateLimits ?? {},
   }
+}
+
+/**
+ * Default admin gate when the consumer doesn't supply `adminAccess`: an
+ * authenticated user in the configured admin collection. Closes the public
+ * REST/GraphQL surface while letting admin-panel operators see/manage the
+ * collections. Computed independently of `resolveConfig` so the disabled path
+ * (which skips issuer/pepper validation) can still gate the kept collections.
+ */
+function resolveAdminAccess(options: PayloadMcpOAuthConfig): Access {
+  if (options.adminAccess) return options.adminAccess
+  const userCollection = options.userCollection ?? 'users'
+  return ({ req }) => req.user?.collection === userCollection
+}
+
+/**
+ * True when the OAuth layer should be a no-op: the consumer set `disabled`, OR
+ * the MCP plugin itself is disabled (we read the shared `mcpPluginOptions` it
+ * also reads). In both cases we keep the collections (schema/migration
+ * consistency) but add no endpoints, do no token-validation wiring, and never
+ * throw PLUGIN_ORDER — `@payloadcms/plugin-mcp` does not register `/mcp` when
+ * disabled, so a thrown PLUGIN_ORDER would otherwise crash the app on boot.
+ */
+export function isPluginDisabled(options: PayloadMcpOAuthConfig): boolean {
+  const mcpDisabled = Boolean((options.mcpPluginOptions as { disabled?: boolean } | undefined)?.disabled)
+  return options.disabled === true || mcpDisabled
+}
+
+/** Open read/update/delete on an operator-facing collection to the admin gate. */
+function withAdminAccess(collection: CollectionConfig, adminAccess: Access): CollectionConfig {
+  return {
+    ...collection,
+    access: { ...collection.access, read: adminAccess, update: adminAccess, delete: adminAccess },
+  }
+}
+
+/**
+ * The four collections this plugin manages. `oauth-clients`/`oauth-tokens` are
+ * operator-facing (admin-gated under the MCP nav group); auth codes + CSRF
+ * nonces stay fully locked + hidden. Registered in every mode (incl. disabled)
+ * for schema consistency — they're relationally isolated (text FKs,
+ * lockDocuments:false), so keeping them never adds cross-table FK columns.
+ */
+function oauthCollections(adminAccess: Access): CollectionConfig[] {
+  return [
+    withAdminAccess(oauthClientsCollection, adminAccess),
+    oauthAuthCodesCollection,
+    withAdminAccess(oauthTokensCollection, adminAccess),
+    oauthCsrfNoncesCollection,
+  ]
 }
 
 function detectMcpEndpoints(config: Config): Endpoint[] {
@@ -142,6 +184,19 @@ function warnIfVersionUntested(): void {
 }
 
 export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConfig): Config {
+  // Register the collections in every mode — including disabled — so the DB
+  // schema stays consistent for migrations (matches the official template +
+  // @payloadcms/plugin-mcp). `adminAccess` is resolved here (not via
+  // resolveConfig) so the disabled path doesn't require issuer/pepper.
+  const collections = [...(incomingConfig.collections ?? []), ...oauthCollections(resolveAdminAccess(options))]
+
+  // No-op path: our `disabled`, or the MCP plugin is disabled. Add no endpoints,
+  // wrap nothing, and skip detectMcpEndpoints (a disabled MCP plugin registers no
+  // /mcp endpoint, which would otherwise throw PLUGIN_ORDER and crash boot).
+  if (isPluginDisabled(options)) {
+    return { ...incomingConfig, collections }
+  }
+
   const resolved = resolveConfig(options)
   const mcpEndpoints = detectMcpEndpoints(incomingConfig)
   warnIfVersionUntested()
@@ -227,32 +282,10 @@ export function buildPlugin(incomingConfig: Config, options: PayloadMcpOAuthConf
     { path: '/oauth/revoke', method: 'options', handler: corsPreflightHandler },
   ]
 
-  // Apply the resolved admin gate to the operator-facing collections so they
-  // render as native entries under the "MCP" nav group (read) and can be
-  // managed there (update/delete) — while staying closed to the public. `create`
-  // remains denied: clients self-register via DCR, tokens are minted by the
-  // token endpoint. The sensitive, short-lived collections (auth codes, CSRF
-  // nonces) stay fully locked and hidden.
-  const withAdminAccess = (collection: typeof oauthClientsCollection): typeof oauthClientsCollection => ({
-    ...collection,
-    access: {
-      ...collection.access,
-      read: resolved.adminAccess,
-      update: resolved.adminAccess,
-      delete: resolved.adminAccess,
-    },
-  })
-
-  // T5.5 / T6: merge collections and endpoints
+  // T5.5 / T6: merge collections (built above, admin-gated) and OAuth endpoints.
   return {
     ...incomingConfig,
-    collections: [
-      ...(incomingConfig.collections ?? []),
-      withAdminAccess(oauthClientsCollection),
-      oauthAuthCodesCollection,
-      withAdminAccess(oauthTokensCollection),
-      oauthCsrfNoncesCollection,
-    ],
+    collections,
     endpoints: [...(incomingConfig.endpoints ?? []), ...oauthEndpoints],
   }
 }

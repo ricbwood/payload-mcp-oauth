@@ -1,6 +1,6 @@
 import type { Plugin } from 'payload'
 import type { PayloadMcpOAuthConfig } from './types.js'
-import { buildPlugin } from './plugin.js'
+import { buildPlugin, isPluginDisabled } from './plugin.js'
 import { installOverrideAuth } from './middleware/wrap-mcp.js'
 
 export type { PayloadMcpOAuthConfig, ResolvedConfig } from './types.js'
@@ -33,7 +33,10 @@ export function payloadMcpOAuth(options: PayloadMcpOAuthConfig): Plugin {
   // By setting overrideAuth here (during the payloadMcpOAuth() call, which happens at config
   // build time before any plugin executes), it is present in mcpOptions when mcpPlugin's
   // definePlugin spreads it, and therefore captured correctly in initializeMCPHandler's closure.
-  if (options.mcpPluginOptions) {
+  // Skip the mutation entirely when disabled (ours, or the MCP plugin's own
+  // `disabled`): leave mcpPluginOptions untouched so the MCP handler runs
+  // API-key-only as normal, and the app boots even if MCP itself is off.
+  if (!isPluginDisabled(options) && options.mcpPluginOptions) {
     installOverrideAuth(options.mcpPluginOptions, options.userCollection ?? 'users')
   }
 
