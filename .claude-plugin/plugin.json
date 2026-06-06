@@ -1,0 +1,14 @@
+{
+  "name": "payload-mcp-oauth",
+  "displayName": "Payload MCP OAuth",
+  "version": "0.1.0",
+  "description": "Install/configure helper for @brainwebuk/payload-plugin-mcp-oauth — OAuth 2.1 + PKCE for a Payload @payloadcms/plugin-mcp server.",
+  "author": {
+    "name": "BrainWeb",
+    "url": "https://www.brainweb.co.uk/"
+  },
+  "homepage": "https://github.com/ricbwood/payload-mcp-oauth",
+  "repository": "https://github.com/ricbwood/payload-mcp-oauth",
+  "license": "MIT",
+  "keywords": ["payload", "payload-cms", "mcp", "oauth", "model-context-protocol"]
+}
