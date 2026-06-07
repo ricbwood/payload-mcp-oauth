@@ -20,12 +20,16 @@ including the OAuth admin views — instead of running the handshake:
 ```bash
 pnpm test:install:serve              # http://localhost:3000
 pnpm test:install:serve -- --port 4000
-pnpm test:install:serve -- --fresh   # rebuild from scratch (otherwise reuses the last install)
+pnpm test:install:serve -- --reuse   # keep the last install (faster restart)
 ```
 
 It prints the admin URL and a seeded login (`install-test@example.com` /
 `install-test-password-123`). The app lives at `<tmp>/pmoauth-serve/app` and is
-reused across launches for speed. Press Ctrl+C to stop.
+**reprovisioned from the freshly packed plugin on every launch by default**, so you
+can never click around a stale build (the false positive that masked the #33
+locked-collection regression — see issue #43). Pass `--reuse` to keep the prior
+install (node_modules + DB) for a fast restart when you *know* the plugin is
+unchanged. Press Ctrl+C to stop.
 
 ## What it does
 
@@ -40,10 +44,12 @@ reused across launches for speed. Press Ctrl+C to stop.
 | Check | Pain point |
 |---|---|
 | `.`, `/middleware`, `/admin` subpaths resolve + export | **Packaging** — bad `exports`/`files`, missing dist subpaths |
-| `importMap.js` references the OAuth admin views after `generate:importmap` | **Import map / admin views** |
+| `importMap.js` injects **no** custom admin components (OAuth screens are native collections) | **Import map / admin views** |
 | `oauth-clients` / `oauth-auth-codes` / `oauth-tokens` are queryable after boot | **DB migrations / schema push** |
 | Full handshake: bare `/.well-known/*` JSON → register → login → authorize → consent → token → **`/api/mcp` accepts the `pmoauth_` token** | **Wiring gotchas** — the "same `mcpOptions` object" / plugin-order trap surfaces as a 401 here |
 | Unauthenticated `/api/mcp` → 401 with `WWW-Authenticate: …resource_metadata` | MCP wrapper |
+| Admin nav surfaces **OAuth Clients / OAuth Tokens** under the **MCP** group and their list routes render for an admin | **Admin visibility** — the #33 regression that hid the OAuth screens |
+| Unauthenticated `GET /api/oauth-clients` / `/api/oauth-tokens` → 401/403 | **Access gating** — the public REST surface stays denied |
 | `NODE_ENV=production` without `PMOAUTH_TOKEN_PEPPER` refuses to boot | **Env** |
 
 ## Files
@@ -53,6 +59,9 @@ reused across launches for speed. Press Ctrl+C to stop.
 - `lib/provision.mjs` — shared provisioning (build → pack → install → importmap →
   migrate) used by both, so the served site matches the tested one.
 - `lib/handshake.mjs` — reusable HTTP OAuth + PKCE handshake and wrapper assertions.
+- `lib/admin-checks.mjs` — asserts the user-visible admin outcome (OAuth collections
+  visible under the MCP nav group + list routes render) and that the public REST
+  surface stays denied.
 - `fixtures/install-seed.mjs` — runs inside the temp app (via `tsx`) to push the
   schema, assert the OAuth collections exist, and seed an admin user.
 

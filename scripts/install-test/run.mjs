@@ -24,6 +24,7 @@ import {
   waitForServer,
 } from './lib/provision.mjs'
 import { runHandshake } from './lib/handshake.mjs'
+import { runAdminChecks } from './lib/admin-checks.mjs'
 
 const KEEP = process.argv.includes('--keep')
 const lockfileSnapshot = readFileSync(LOCKFILE, 'utf8')
@@ -44,7 +45,7 @@ try {
   const port = await freePort()
 
   // 1. Provision the real published artifact into an isolated app.
-  console.log('\n[1/6] Provisioning (build → pack → install → importmap → migrate)…')
+  console.log('\n[1/7] Provisioning (build → pack → install → importmap → migrate)…')
   const { baseUrl, appEnv, tgzPath, importMapContent, seedResult } = await provisionApp({
     appDir,
     port,
@@ -58,7 +59,7 @@ try {
   //    /admin pull in next/react, which only resolve inside the bundler, not
   //    under plain Node — so importing them here would be a false negative. We
   //    do import the server-only `.` entry to confirm it executes and exports.
-  console.log('\n[2/6] Verifying published entry points resolve…')
+  console.log('\n[2/7] Verifying published entry points resolve…')
   const probe = [
     "import { createRequire } from 'node:module'",
     'const require = createRequire(process.cwd() + "/package.json")',
@@ -77,7 +78,7 @@ try {
   // 3. Import map: the plugin registers NO custom admin components — the OAuth
   // screens are native collections under the MCP nav group. Guard against a
   // regression that re-introduces the (Payload-v3-incompatible) custom views.
-  console.log('\n[3/6] Checking the admin import map…')
+  console.log('\n[3/7] Checking the admin import map…')
   check(
     'importmap: plugin injects no custom admin components (OAuth screens are native collections)',
     !importMapContent.includes('payload-plugin-mcp-oauth/admin'),
@@ -85,7 +86,7 @@ try {
   )
 
   // 4. DB migrations: the plugin's collections must be queryable.
-  console.log('\n[4/6] Checking the OAuth collections (schema push)…')
+  console.log('\n[4/7] Checking the OAuth collections (schema push)…')
   check(
     'migrations: oauth-clients / oauth-auth-codes / oauth-tokens are queryable',
     seedResult.ok === true && Object.values(seedResult.collections ?? {}).every(Boolean),
@@ -93,7 +94,7 @@ try {
   )
 
   // 5. Start the app and drive the full handshake.
-  console.log('\n[5/6] Starting the app and running the OAuth + PKCE handshake…')
+  console.log('\n[5/7] Starting the app and running the OAuth + PKCE handshake…')
   server = startDevServer({ appDir, port, appEnv })
   let serverLog = ''
   server.stdout.on('data', (d) => (serverLog += d))
@@ -112,8 +113,24 @@ try {
     console.log(`\n--- dev server log tail ---\n${serverLog.slice(-3000)}\n---------------------------`)
   }
 
-  // 6. Production safety: no pepper must refuse to boot (env pain point).
-  console.log('\n[6/6] Verifying production boot hardening (https issuer + token pepper)…')
+  // 6. User-visible admin outcome: an admin can see + open OAuth Clients/Tokens
+  //    under the MCP nav group, and the public REST surface stays denied. This is
+  //    the assertion the harness lacked when the #33 locked-collection regression
+  //    shipped — the import-map check in [3/7] never proved the screens are
+  //    reachable. Reuses the still-running server from [5/7].
+  console.log('\n[6/7] Checking the OAuth admin collections are visible + access-gated…')
+  const beforeAdmin = checks.length
+  try {
+    await runAdminChecks({ baseUrl, email: ADMIN.email, password: ADMIN.password, check })
+  } catch (err) {
+    check('admin: OAuth collections visible + gated', false, err.message)
+  }
+  if (checks.slice(beforeAdmin).some((c) => !c.ok)) {
+    console.log(`\n--- dev server log tail ---\n${serverLog.slice(-3000)}\n---------------------------`)
+  }
+
+  // 7. Production safety: no pepper must refuse to boot (env pain point).
+  console.log('\n[7/7] Verifying production boot hardening (https issuer + token pepper)…')
   const bootProbe = "import('./src/payload.config.ts').then(m=>m.default).then(c=>import('payload').then(p=>p.getPayload({config:c})))"
   // (a) production with a non-https issuer (appEnv issuer is http://localhost) must be refused.
   let prodHttpErr = ''
