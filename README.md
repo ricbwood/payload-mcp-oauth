@@ -91,7 +91,7 @@ export default buildConfig({
 > [Plugin API](https://payloadcms.com/docs/plugins/plugin-api) explicitly permits
 > (`plugins['…']?.options`), rather than our own incoming config. It's the most
 > fragile part of the setup, so we're tracking less-footgun-prone alternatives in
-> [issue #51](https://github.com/ricbwood/payload-mcp-oauth/issues/51).
+> [issue #51](https://github.com/BrainWeb/payload-mcp-oauth/issues/51).
 
 ### 3. Add the proxy (Next.js 16) / middleware (Next.js 14–15)
 
@@ -281,7 +281,7 @@ walks Claude Code through wiring up the plugin (config, proxy, env, schema) and 
 common pitfalls. In Claude Code:
 
 ```
-/plugin marketplace add ricbwood/payload-mcp-oauth
+/plugin marketplace add BrainWeb/payload-mcp-oauth
 /plugin install payload-mcp-oauth@brainwebuk
 ```
 
