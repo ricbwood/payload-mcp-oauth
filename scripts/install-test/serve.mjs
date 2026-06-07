@@ -6,10 +6,14 @@
 //
 // Usage:  pnpm test:install:serve            # http://localhost:3000
 //         pnpm test:install:serve -- --port 4000
-//         pnpm test:install:serve -- --fresh # rebuild from scratch (else reuse)
+//         pnpm test:install:serve -- --reuse # reuse the prior install (faster)
 //
-// The app lives at <tmp>/pmoauth-serve/app and is reused across launches for
-// speed; --fresh wipes and reprovisions it. Press Ctrl+C to stop.
+// The app lives at <tmp>/pmoauth-serve/app. It is reprovisioned from the freshly
+// packed plugin on every launch by default, so you can never click around a
+// stale build (the false-positive that masked the #33 locked-collection
+// regression — see issue #43). Pass --reuse to keep the prior install
+// (node_modules + DB) for a fast restart when you KNOW the plugin is unchanged.
+// Press Ctrl+C to stop.
 
 import { mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -35,7 +39,7 @@ function argValue(name, fallback) {
   const i = process.argv.indexOf(name)
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback
 }
-const FRESH = process.argv.includes('--fresh')
+const REUSE = process.argv.includes('--reuse')
 const wantedPort = Number(argValue('--port', '3000'))
 
 const appDir = path.join(tmpdir(), 'pmoauth-serve', 'app')
@@ -71,13 +75,13 @@ try {
   const baseUrl = `http://localhost:${port}`
 
   let appEnv
-  if (FRESH || !isProvisioned(appDir)) {
+  if (!REUSE || !isProvisioned(appDir)) {
     rmSync(path.dirname(appDir), { recursive: true, force: true })
     mkdirSync(appDir, { recursive: true })
     console.log('Provisioning the test site from the packed plugin (first run is slow — a full install + cold compile)…\n')
     ;({ appEnv } = await provisionApp({ appDir, port, log: (m) => console.log(`   • ${m}`) }))
   } else {
-    console.log(`Reusing the existing install at ${appDir} (pass --fresh to rebuild).`)
+    console.log(`Reusing the existing install at ${appDir} (--reuse). Drop --reuse to rebuild from the freshly packed plugin.`)
     // Re-sync the app source so the reused install reflects current repo source
     // (e.g. the proxy.ts migration) instead of whatever was copied at first
     // provision. Keeps node_modules + the DB, so reuse stays fast.
