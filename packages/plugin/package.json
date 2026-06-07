@@ -9,11 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ricbwood/payload-mcp-oauth.git",
+    "url": "git+https://github.com/BrainWeb/payload-mcp-oauth.git",
     "directory": "packages/plugin"
   },
-  "homepage": "https://github.com/ricbwood/payload-mcp-oauth/tree/main/packages/plugin#readme",
-  "bugs": "https://github.com/ricbwood/payload-mcp-oauth/issues",
+  "homepage": "https://github.com/BrainWeb/payload-mcp-oauth/tree/main/packages/plugin#readme",
+  "bugs": "https://github.com/BrainWeb/payload-mcp-oauth/issues",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -7,8 +7,8 @@
     "name": "BrainWeb",
     "url": "https://www.brainweb.co.uk/"
   },
-  "homepage": "https://github.com/ricbwood/payload-mcp-oauth",
-  "repository": "https://github.com/ricbwood/payload-mcp-oauth",
+  "homepage": "https://github.com/BrainWeb/payload-mcp-oauth",
+  "repository": "https://github.com/BrainWeb/payload-mcp-oauth",
   "license": "MIT",
   "keywords": ["payload", "payload-cms", "mcp", "oauth", "model-context-protocol"]
 }
