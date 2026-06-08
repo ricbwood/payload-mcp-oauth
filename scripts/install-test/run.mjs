@@ -129,9 +129,29 @@ try {
     console.log(`\n--- dev server log tail ---\n${serverLog.slice(-3000)}\n---------------------------`)
   }
 
-  // 7. Production safety: no pepper must refuse to boot (env pain point).
-  console.log('\n[7/7] Verifying production boot hardening (https issuer + token pepper)…')
+  // 7. Boot matrix: the config must boot cleanly when the plugin is DISABLED
+  //    (a no-op that still keeps its collections), and must REFUSE to boot in
+  //    production when the env is unsafe. Both are non-server probes of the real
+  //    example config via tsx — fast, no dev server.
+  console.log('\n[7/7] Verifying boot-time behaviour (disabled no-op boots; production hardening refuses)…')
   const bootProbe = "import('./src/payload.config.ts').then(m=>m.default).then(c=>import('payload').then(p=>p.getPayload({config:c})))"
+
+  // (0) disabled matrix — both disable paths must boot cleanly. mcpPlugin disabled
+  //     was the 0.3.3 boot crash (payloadMcpOAuth threw PLUGIN_ORDER because /mcp
+  //     wasn't registered). Each runs in dev (so schema push runs) against its own
+  //     throwaway DB, so the disabled plugin's kept collections are exercised too.
+  for (const [name, extraEnv] of [
+    ['payloadMcpOAuth({ disabled: true })', { PMOAUTH_TEST_OAUTH_DISABLED: '1', DATABASE_URL: 'file:./disabled-oauth.db' }],
+    ['mcpPlugin disabled (shared mcpOptions)', { PMOAUTH_TEST_MCP_DISABLED: '1', DATABASE_URL: 'file:./disabled-mcp.db' }],
+  ]) {
+    let bootErr = ''
+    await run('node', ['--import', 'tsx', '-e', bootProbe], {
+      cwd: appDir,
+      env: { ...process.env, ...appEnv, NODE_ENV: 'development', ...extraEnv },
+    }).catch((e) => (bootErr = e.message))
+    check(`disabled: ${name} boots cleanly (no-op, collections kept)`, !bootErr, bootErr.slice(-1200))
+  }
+
   // (a) production with a non-https issuer (appEnv issuer is http://localhost) must be refused.
   let prodHttpErr = ''
   await run('node', ['--import', 'tsx', '-e', bootProbe], {
