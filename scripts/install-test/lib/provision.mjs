@@ -204,8 +204,10 @@ export async function provisionApp({ appDir, port, log = () => {} }) {
     recursive: true,
     filter: (src) => !EXCLUDE.has(path.basename(src)) && !path.basename(src).endsWith('.db'),
   })
-  // Copy the in-app seed fixture next to package.json so tsx can import the config.
+  // Copy the in-app fixtures next to package.json so tsx can run them with the
+  // temp app's node_modules (the installed tarball) on the resolution path.
   cpSync(path.join(INSTALL_ROOT, 'fixtures/install-seed.mjs'), path.join(appDir, 'install-seed.mjs'))
+  cpSync(path.join(INSTALL_ROOT, 'fixtures/admin-access-probe.mjs'), path.join(appDir, 'admin-access-probe.mjs'))
 
   const pkgPath = path.join(appDir, 'package.json')
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'))

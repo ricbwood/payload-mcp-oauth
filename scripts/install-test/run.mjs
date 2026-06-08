@@ -129,6 +129,26 @@ try {
     console.log(`\n--- dev server log tail ---\n${serverLog.slice(-3000)}\n---------------------------`)
   }
 
+  // The HTTP checks above cover the DEFAULT gate (any user in the admin
+  // collection). The security boundary that mattered for the regression is a
+  // CUSTOM adminAccess rule that distinguishes admins from other authenticated
+  // users — a non-admin must NOT be able to read the OAuth collections. Exercise
+  // that via a Local-API fixture (no server) on its own throwaway DB.
+  let aaErr = ''
+  const aaOut = await run('node', ['--import', 'tsx', 'admin-access-probe.mjs'], {
+    cwd: appDir,
+    env: { ...process.env, ...appEnv, NODE_ENV: 'development', DATABASE_URL: 'file:./admin-access.db' },
+  }).catch((e) => ((aaErr = e.message), e.message))
+  const aaLine = String(aaOut).split('\n').find((l) => l.includes('ADMIN_ACCESS_RESULT'))
+  let aa = {}
+  try {
+    aa = JSON.parse(aaLine.replace('ADMIN_ACCESS_RESULT', '').trim())
+  } catch {
+    aa = { ok: false, error: aaErr || String(aaOut).slice(-1500) }
+  }
+  check('adminAccess: a custom role-based gate allows admins to read the OAuth collections', aa.adminAllowed === true, aa.error ?? `adminAllowed=${aa.adminAllowed}`)
+  check('adminAccess: the same gate denies a non-admin (authenticated) user', aa.nonAdminDenied === true, aa.error ?? `nonAdminDenied=${aa.nonAdminDenied}`)
+
   // 7. Boot matrix: the config must boot cleanly when the plugin is DISABLED
   //    (a no-op that still keeps its collections), and must REFUSE to boot in
   //    production when the env is unsafe. Both are non-server probes of the real
