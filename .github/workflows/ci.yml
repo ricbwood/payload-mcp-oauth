@@ -30,6 +30,13 @@ jobs:
       - name: Build plugin
         run: pnpm --filter './packages/plugin' build
 
+      - name: Check doc examples compile
+        # Type-checks the ```ts``` blocks in README.md / INSTALL_FOR_AGENTS.md
+        # against the real plugin + @payloadcms/plugin-mcp types, so a bad example
+        # (e.g. a config property at the wrong level) can't ship for a consumer or
+        # an install agent to copy-paste. Uses the plugin dist built above.
+        run: node scripts/check-doc-snippets.mjs
+
       - name: Typecheck
         run: pnpm typecheck
 

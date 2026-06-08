@@ -53,3 +53,6 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Temp dir for the doc-snippet type-check (scripts/check-doc-snippets.mjs)
+/.doc-snippets/
