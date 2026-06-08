@@ -25,6 +25,14 @@ const mcpOptions: MCPPluginConfig = {
   },
 }
 
+// Disable the MCP layer the way a real consumer would: set `disabled` on the
+// SHARED mcpOptions object so BOTH mcpPlugin and payloadMcpOAuth (which reads
+// this same reference) observe it — payloadMcpOAuth then becomes a no-op instead
+// of throwing PLUGIN_ORDER when @payloadcms/plugin-mcp doesn't register /mcp.
+// Env-gated and off by default; the install-test disabled matrix flips it to
+// assert a clean boot (the 0.3.3 crash path — issue #43).
+if (process.env.PMOAUTH_TEST_MCP_DISABLED === '1') mcpOptions.disabled = true
+
 export default buildConfig({
   admin: {
     user: Users.slug,
@@ -50,6 +58,9 @@ export default buildConfig({
     payloadMcpOAuth({
       issuer: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
       mcpPluginOptions: mcpOptions,
+      // Env-gated for the install-test disabled matrix: the OAuth layer must be a
+      // clean no-op (keeps its collections, adds no endpoints) when disabled.
+      ...(process.env.PMOAUTH_TEST_OAUTH_DISABLED === '1' ? { disabled: true } : {}),
     }),
   ],
 })

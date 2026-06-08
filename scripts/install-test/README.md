@@ -50,6 +50,7 @@ unchanged. Press Ctrl+C to stop.
 | Unauthenticated `/api/mcp` → 401 with `WWW-Authenticate: …resource_metadata` | MCP wrapper |
 | Admin nav surfaces **OAuth Clients / OAuth Tokens** under the **MCP** group and their list routes render for an admin | **Admin visibility** — the #33 regression that hid the OAuth screens |
 | Unauthenticated `GET /api/oauth-clients` / `/api/oauth-tokens` → 401/403 | **Access gating** — the public REST surface stays denied |
+| `payloadMcpOAuth({ disabled: true })` and `mcpPlugin` disabled (shared `mcpOptions`) both boot cleanly | **Disabled no-op** — the 0.3.3 boot crash when MCP is disabled |
 | `NODE_ENV=production` without `PMOAUTH_TOKEN_PEPPER` refuses to boot | **Env** |
 
 ## Files
