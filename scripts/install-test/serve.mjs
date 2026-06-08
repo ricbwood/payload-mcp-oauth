@@ -7,6 +7,10 @@
 // Usage:  pnpm test:install:serve            # http://localhost:3000
 //         pnpm test:install:serve -- --port 4000
 //         pnpm test:install:serve -- --reuse # reuse the prior install (faster)
+//         pnpm test:install:serve -- --live  # expose a public HTTPS URL via a
+//                                            # Cloudflare tunnel and use it as the
+//                                            # OAuth issuer, so you can add the site
+//                                            # as a Custom Connector in Claude.ai
 //
 // The app lives at <tmp>/pmoauth-serve/app. It is reprovisioned from the freshly
 // packed plugin on every launch by default, so you can never click around a
@@ -30,6 +34,7 @@ import {
   refreshAppSource,
   restoreLockfile,
   seedAndMigrate,
+  startCloudflaredTunnel,
   startDevServer,
   waitForServer,
   writeEnv,
@@ -40,12 +45,14 @@ function argValue(name, fallback) {
   return i >= 0 && process.argv[i + 1] ? process.argv[i + 1] : fallback
 }
 const REUSE = process.argv.includes('--reuse')
+const LIVE = process.argv.includes('--live')
 const wantedPort = Number(argValue('--port', '3000'))
 
 const appDir = path.join(tmpdir(), 'pmoauth-serve', 'app')
 const lockfileSnapshot = readFileSync(LOCKFILE, 'utf8')
 
 let server
+let tunnel
 let shuttingDown = false
 function shutdown() {
   if (shuttingDown) return
@@ -54,6 +61,14 @@ function shutdown() {
     try {
       // startDevServer runs detached, so kill the whole process group.
       process.kill(-server.pid, 'SIGKILL')
+    } catch {
+      /* already gone */
+    }
+  }
+  if (tunnel?.proc) {
+    // cloudflared is detached too — kill the whole group.
+    try {
+      process.kill(-tunnel.proc.pid, 'SIGKILL')
     } catch {
       /* already gone */
     }
@@ -74,12 +89,22 @@ try {
   if (port !== wantedPort) console.log(`Port ${wantedPort} is busy → using ${port} instead.`)
   const baseUrl = `http://localhost:${port}`
 
+  // --live: bring up a public HTTPS tunnel BEFORE provisioning so the app is
+  // provisioned with the tunnel URL as its OAuth issuer (+ Payload serverURL).
+  // The dev server still binds localhost:port; cloudflared forwards to it.
+  let publicUrl = baseUrl
+  if (LIVE) {
+    console.log('Opening a Cloudflare quick tunnel (public HTTPS URL for Claude.ai)…')
+    tunnel = await startCloudflaredTunnel({ port, log: (m) => console.log(`   • ${m}`) })
+    publicUrl = tunnel.url
+  }
+
   let appEnv
   if (!REUSE || !isProvisioned(appDir)) {
     rmSync(path.dirname(appDir), { recursive: true, force: true })
     mkdirSync(appDir, { recursive: true })
     console.log('Provisioning the test site from the packed plugin (first run is slow — a full install + cold compile)…\n')
-    ;({ appEnv } = await provisionApp({ appDir, port, log: (m) => console.log(`   • ${m}`) }))
+    ;({ appEnv } = await provisionApp({ appDir, port, publicUrl, log: (m) => console.log(`   • ${m}`) }))
   } else {
     console.log(`Reusing the existing install at ${appDir} (--reuse). Drop --reuse to rebuild from the freshly packed plugin.`)
     // Re-sync the app source so the reused install reflects current repo source
@@ -89,11 +114,20 @@ try {
     // Reuse the env from the prior provision so PMOAUTH_TOKEN_PEPPER / PAYLOAD_SECRET
     // stay stable across launches — otherwise OAuth tokens already stored in the
     // persisted DB (hashed with the old pepper) would stop validating. Only the
-    // public server URL changes, to match the (possibly new) port.
+    // public server URL changes, to match the (possibly new) port or tunnel URL.
     const prior = readEnv(appDir)
-    appEnv = prior.PMOAUTH_TOKEN_PEPPER ? { ...prior, NEXT_PUBLIC_SERVER_URL: baseUrl } : makeAppEnv(baseUrl)
+    appEnv = prior.PMOAUTH_TOKEN_PEPPER ? { ...prior, NEXT_PUBLIC_SERVER_URL: publicUrl } : makeAppEnv(publicUrl)
     writeEnv(appDir, appEnv)
     await seedAndMigrate(appDir, appEnv)
+  }
+
+  // --live: tell Payload to treat the tunnel URL as serverURL + an allowed CSRF
+  // origin (see payload.config.ts), so the browser consent POST keeps the session.
+  // Only in --live: setting serverURL on plain localhost breaks the origin-less
+  // session checks. The OAuth issuer is already the tunnel URL via NEXT_PUBLIC_SERVER_URL.
+  if (LIVE) {
+    appEnv = { ...appEnv, PMOAUTH_PUBLIC_URL: publicUrl }
+    writeEnv(appDir, appEnv)
   }
 
   // Provisioning is the only thing that can perturb the repo lockfile; the dev
@@ -123,10 +157,23 @@ try {
 
   await waitForServer(`${baseUrl}/admin`, 180_000, server)
 
+  // In --live mode the OAuth issuer is the tunnel URL, so discovery + the Claude.ai
+  // connector must use it; the admin panel stays on localhost for fast direct access.
+  const liveSection = LIVE
+    ? `
+  🌐  Public URL (Claude.ai Custom Connector):
+      ${publicUrl}
+
+  Add it in Claude.ai → Settings → Connectors → Add custom connector,
+  then paste the public URL above. Claude discovers the auth server,
+  registers itself, and runs the OAuth + PKCE consent flow.
+`
+    : ''
+
   console.log(`
 ────────────────────────────────────────────────────────────
   ✅  Test Payload site is up — installed from the packed plugin.
-
+${liveSection}
   Admin panel : ${baseUrl}/admin
       sign in : ${ADMIN.email}  /  ${ADMIN.password}
 
@@ -135,11 +182,11 @@ try {
       tokens  : ${baseUrl}/admin/collections/oauth-tokens
 
   OAuth discovery (served via the middleware):
-      ${baseUrl}/.well-known/oauth-authorization-server
-      ${baseUrl}/.well-known/oauth-protected-resource
+      ${publicUrl}/.well-known/oauth-authorization-server
+      ${publicUrl}/.well-known/oauth-protected-resource
 
   App location: ${appDir}
-  Press Ctrl+C to stop.
+  Press Ctrl+C to stop${LIVE ? ' (also closes the tunnel)' : ''}.
 ────────────────────────────────────────────────────────────
 `)
   // Idle until Ctrl+C; the detached dev server keeps serving.

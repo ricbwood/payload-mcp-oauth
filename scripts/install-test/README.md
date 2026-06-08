@@ -21,7 +21,15 @@ including the OAuth admin views — instead of running the handshake:
 pnpm test:install:serve              # http://localhost:3000
 pnpm test:install:serve -- --port 4000
 pnpm test:install:serve -- --reuse   # keep the last install (faster restart)
+pnpm test:install:serve -- --live    # expose a public HTTPS URL for Claude.ai
 ```
+
+**`--live`** opens a Cloudflare quick tunnel (`*.trycloudflare.com`, no login —
+needs `cloudflared` installed), uses that public HTTPS URL as the OAuth **issuer**
+and Payload **serverURL**/CSRF origin, and prints it with instructions to add the
+site as a **Custom Connector in Claude.ai**. The dev server still binds localhost;
+cloudflared forwards to it. Ctrl+C closes the tunnel too. This is the way to drive
+a *real* end-to-end OAuth connection from Claude.ai against your local build.
 
 It prints the admin URL and a seeded login (`install-test@example.com` /
 `install-test-password-123`). The app lives at `<tmp>/pmoauth-serve/app` and is

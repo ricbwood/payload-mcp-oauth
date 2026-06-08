@@ -42,6 +42,15 @@ export default buildConfig({
   },
   collections: [Users, Media],
   editor: lexicalEditor(),
+  // When the app is served behind a PUBLIC URL (test:install:serve --live sets
+  // PMOAUTH_PUBLIC_URL to the tunnel URL), set serverURL + allow that origin for
+  // CSRF so the browser consent POST keeps the Payload session — real starters do
+  // the same via getServerSideURL(). Left UNSET on plain localhost: setting
+  // serverURL changes Payload's cookie/CSRF handling and rejects the origin-less
+  // server-to-server session checks the localhost flow relies on.
+  ...(process.env.PMOAUTH_PUBLIC_URL
+    ? { serverURL: process.env.PMOAUTH_PUBLIC_URL, csrf: [process.env.PMOAUTH_PUBLIC_URL] }
+    : {}),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
