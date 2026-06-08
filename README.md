@@ -355,6 +355,54 @@ handler unchanged.
 
 ---
 
+## Development
+
+This repo is a pnpm workspace: the published plugin lives in `packages/plugin`, and
+`examples/payload-app` is a reference Payload 3 app (SQLite) used for integration
+testing.
+
+```bash
+pnpm install                  # once, at the repo root
+pnpm dev:example              # run the reference example app (workspace source)
+pnpm --filter ./packages/plugin build   # build the plugin
+pnpm test                     # unit tests across the workspace
+pnpm typecheck                # type-check
+pnpm lint                     # lint
+```
+
+### Spin up a test site from the packaged plugin
+
+`test:install:serve` installs the **packed** plugin (`pnpm pack`, i.e. the real
+published artifact) into a throwaway app, wires it up exactly as the docs above
+describe, and leaves `next dev` running so you can click around — including the
+OAuth admin screens.
+
+```bash
+pnpm test:install:serve              # http://localhost:3000
+pnpm test:install:serve -- --port 4000
+pnpm test:install:serve -- --reuse   # skip the rebuild, reuse the last install (fast restart)
+```
+
+It prints the URL and a seeded admin login (`install-test@example.com` /
+`install-test-password-123`). It is **fresh-by-default** — every launch reprovisions
+from the freshly packed plugin so you never click around a stale build; pass
+`--reuse` once a launch has succeeded for a faster restart. First run is slow (a full
+`pnpm install` + cold compile — allow a couple of minutes). Press Ctrl+C to stop.
+
+### Run the from-scratch install test
+
+```bash
+pnpm test:install                    # asserts the full install + OAuth handshake end to end
+pnpm test:install -- --keep          # keep the temp app on success, for debugging
+```
+
+This is the harness that drives packaging, the admin import map, schema push, the
+OAuth + PKCE handshake, admin visibility/access gating, the disabled matrix, and
+incremental install — see [`scripts/install-test/README.md`](scripts/install-test/README.md)
+for the full list of what it checks and why.
+
+---
+
 ## License
 
 MIT
