@@ -15,6 +15,7 @@
     "test:install": "node scripts/install-test/run.mjs",
     "test:install:serve": "node scripts/install-test/serve.mjs",
     "test:install-unit": "node --test scripts/install-test/test/helpers.test.mjs",
+    "check:docs": "pnpm --filter './packages/plugin' build && node scripts/check-doc-snippets.mjs",
     "dev:example": "pnpm --filter ./examples/payload-app dev",
     "prepare": "husky"
   },
