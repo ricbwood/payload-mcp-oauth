@@ -50,6 +50,7 @@ unchanged. Press Ctrl+C to stop.
 | Unauthenticated `/api/mcp` → 401 with `WWW-Authenticate: …resource_metadata` | MCP wrapper |
 | Admin nav surfaces **OAuth Clients / OAuth Tokens** under the **MCP** group and their list routes render for an admin | **Admin visibility** — the #33 regression that hid the OAuth screens |
 | Unauthenticated `GET /api/oauth-clients` / `/api/oauth-tokens` → 401/403 | **Access gating** — the public REST surface stays denied |
+| A custom role-based `adminAccess` rule allows admins but denies a non-admin authenticated user | **Access gating** — the admin gate is not a bare `Boolean(req.user)` |
 | `payloadMcpOAuth({ disabled: true })` and `mcpPlugin` disabled (shared `mcpOptions`) both boot cleanly | **Disabled no-op** — the 0.3.3 boot crash when MCP is disabled |
 | Adding the plugin onto an already-pushed DB boots (no locked-docs rebuild crash) | **Incremental install** — the 0.3.2 `no such column: oauth_clients_id` |
 | `NODE_ENV=production` without `PMOAUTH_TOKEN_PEPPER` refuses to boot | **Env** |
@@ -66,6 +67,9 @@ unchanged. Press Ctrl+C to stop.
   surface stays denied.
 - `fixtures/install-seed.mjs` — runs inside the temp app (via `tsx`) to push the
   schema, assert the OAuth collections exist, and seed an admin user.
+- `fixtures/admin-access-probe.mjs` — runs inside the temp app (via `tsx`) with a
+  custom role-based `adminAccess` rule and asserts, via the Local API, that an
+  admin can read the OAuth collections while a non-admin authenticated user can't.
 
 ## Notes / tradeoffs
 
