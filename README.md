@@ -381,7 +381,13 @@ OAuth admin screens.
 pnpm test:install:serve              # http://localhost:3000
 pnpm test:install:serve -- --port 4000
 pnpm test:install:serve -- --reuse   # skip the rebuild, reuse the last install (fast restart)
+pnpm test:install:serve -- --live    # expose a public HTTPS URL (Cloudflare tunnel) for Claude.ai
 ```
+
+`--live` opens a Cloudflare quick tunnel (needs [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/);
+no login required), wires that public HTTPS URL as the OAuth issuer + Payload
+`serverURL`, and prints steps to add the site as a **Custom Connector in Claude.ai** —
+so you can drive a real OAuth connection against your local build.
 
 It prints the URL and a seeded admin login (`install-test@example.com` /
 `install-test-password-123`). It is **fresh-by-default** — every launch reprovisions
