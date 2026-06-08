@@ -55,12 +55,22 @@ export default buildConfig({
   sharp,
   plugins: [
     mcpPlugin(mcpOptions),
-    payloadMcpOAuth({
-      issuer: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
-      mcpPluginOptions: mcpOptions,
-      // Env-gated for the install-test disabled matrix: the OAuth layer must be a
-      // clean no-op (keeps its collections, adds no endpoints) when disabled.
-      ...(process.env.PMOAUTH_TEST_OAUTH_DISABLED === '1' ? { disabled: true } : {}),
-    }),
+    // Env-gated for the install-test incremental-install probe: omit the OAuth
+    // plugin entirely so a first boot pushes a DB WITHOUT the OAuth collections,
+    // then a second boot WITH the plugin exercises adding them onto an existing
+    // DB — the 0.3.2 `no such column: oauth_clients_id` locked-documents rebuild
+    // path. Off by default (issue #43).
+    ...(process.env.PMOAUTH_TEST_OAUTH_OMITTED === '1'
+      ? []
+      : [
+          payloadMcpOAuth({
+            issuer: process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:3000',
+            mcpPluginOptions: mcpOptions,
+            // Env-gated for the install-test disabled matrix: the OAuth layer must
+            // be a clean no-op (keeps its collections, adds no endpoints) when
+            // disabled.
+            ...(process.env.PMOAUTH_TEST_OAUTH_DISABLED === '1' ? { disabled: true } : {}),
+          }),
+        ]),
   ],
 })

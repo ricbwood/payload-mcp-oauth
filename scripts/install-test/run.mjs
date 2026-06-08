@@ -152,6 +152,30 @@ try {
     check(`disabled: ${name} boots cleanly (no-op, collections kept)`, !bootErr, bootErr.slice(-1200))
   }
 
+  // (0b) incremental install — adding the plugin to an ALREADY-pushed DB must not
+  //      crash. This was 0.3.2: the OAuth collections' FK in payload_locked_
+  //      documents_rels forced a rebuild whose INSERT…SELECT referenced not-yet-
+  //      existing columns → `no such column: oauth_clients_id`. Boot once with the
+  //      plugin OMITTED (pushes a DB without the OAuth collections), then again
+  //      WITH it on the SAME db file, which must boot. Fixed via lockDocuments:false.
+  const incDb = 'file:./incremental-install.db'
+  let incBaseErr = ''
+  await run('node', ['--import', 'tsx', '-e', bootProbe], {
+    cwd: appDir,
+    env: { ...process.env, ...appEnv, NODE_ENV: 'development', DATABASE_URL: incDb, PMOAUTH_TEST_OAUTH_OMITTED: '1' },
+  }).catch((e) => (incBaseErr = e.message))
+  check('incremental: baseline app (plugin omitted) pushes a fresh DB', !incBaseErr, incBaseErr.slice(-1200))
+  let incAddErr = ''
+  await run('node', ['--import', 'tsx', '-e', bootProbe], {
+    cwd: appDir,
+    env: { ...process.env, ...appEnv, NODE_ENV: 'development', DATABASE_URL: incDb },
+  }).catch((e) => (incAddErr = e.message))
+  check(
+    'incremental: adding the OAuth plugin onto the existing DB boots (no locked-docs rebuild crash)',
+    !incAddErr,
+    incAddErr ? `second boot failed — a "no such column: oauth_clients_id" here is the 0.3.2 regression:\n${incAddErr.slice(-1500)}` : '',
+  )
+
   // (a) production with a non-https issuer (appEnv issuer is http://localhost) must be refused.
   let prodHttpErr = ''
   await run('node', ['--import', 'tsx', '-e', bootProbe], {
